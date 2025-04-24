@@ -15,9 +15,9 @@ Interpretation of the values? That's not figured out yet lol
 
 Pi Pico -> FACET
 
-SDA: Pi Pico Pin 6 (GP4) -> FACET Pin 26
-SCL: Pi Pico Pin 7 (GP5) -> FACET Pin 25
-GND -> GND
+- SDA: Pi Pico Pin 6 (GP4) -> FACET Pin 26
+- SCL: Pi Pico Pin 7 (GP5) -> FACET Pin 25
+- GND -> GND
 
 ## Usage
 
