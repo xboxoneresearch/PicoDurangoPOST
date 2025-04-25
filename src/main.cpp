@@ -18,6 +18,11 @@ State currentState = STATE_REPL;
 String inputBuffer = "";
 
 typedef struct {
+    uint16_t code;
+    const char *name;
+} PostCode, *PPostCode;
+
+typedef struct {
     uint8_t address;
     const char *name;
 } I2cDevice, *PI2cDevice;
@@ -32,6 +37,12 @@ I2cDevice KnownDevices[] = {
     {0x38, "MAX6958/9A"},
     {0x39, "MAX6958/9B"},
     {0x5A, "RF Unit"},
+    {NULL, NULL}
+};
+
+PostCode PostCodes[] = {
+    {0x14FF, "SUCCESS"},
+    {0x0075, "SUCCESS"},
     {NULL, NULL}
 };
 
@@ -55,7 +66,7 @@ enum MAX6958Registers {
 
 uint8_t registers[REGISTER_SIZE];
 bool newData = false;
-bool newCode = false;
+uint16_t currentCode = 0;
 
 void receiveEvent(int howMany) {
     int reg = -1;
@@ -67,7 +78,11 @@ void receiveEvent(int howMany) {
             registers[reg] = Wire.read();
             if (reg == Segments) {
                 // Signal that we have a new POST code
-                newCode = true;
+                currentCode = 0;
+                currentCode |= registers[Digit0] & 0x0F;
+                currentCode |= (registers[Digit1] & 0x0F) << 4;
+                currentCode |= (registers[Digit2] & 0x0F) << 8;
+                currentCode |= (registers[Digit3] & 0x0F) << 12;
             }
             // After each byte the target register address is automatically incremented
             // This allow communication to be more dense
@@ -76,6 +91,18 @@ void receiveEvent(int howMany) {
         }
     }
     newData = true;
+}
+
+const char* getNameForPostcode(uint16_t code) {
+    PPostCode pPostCodes = PostCodes;
+    while (pPostCodes->name != NULL) {
+        if (pPostCodes->code == code) {
+            return pPostCodes->name;
+        }
+        pPostCodes++;
+    }
+
+    return NULL;
 }
 
 const char* getDeviceNameForAddress(uint8_t addr) {
@@ -194,14 +221,19 @@ void printRegisters() {
     }
 }
 
-void printCode() {
-    Serial.printf("CODE (SEG: 0x%02x): 0x%x%x%x%x\r\n",
+void printCode(uint16_t code) {
+    const char *name = getNameForPostcode(code);
+
+    Serial.printf("CODE (SEG: 0x%02x): 0x%04x",
         registers[Segments],
-        registers[Digit3],
-        registers[Digit2],
-        registers[Digit1],
-        registers[Digit0]
+        code
     );
+
+    if (name != NULL) {
+        Serial.printf(" [%s]\r\n", name);
+    } else {
+        Serial.println();
+    }
 }
 
 void loop() {
@@ -224,9 +256,9 @@ void loop() {
             if (newData) {
                 newData = false;
             }
-            if (newCode) {
-                printCode();
-                newCode = false;
+            if (currentCode != 0) {
+                printCode(currentCode);
+                currentCode = 0;
             }
             break;
             
