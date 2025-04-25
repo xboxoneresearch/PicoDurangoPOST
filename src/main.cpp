@@ -1,6 +1,11 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+// If you need to use different I/O pins for I2C, change it here
+#define PIN_SDA 0
+#define PIN_SCL 1
+// ---
+
 #define SLAVE_ADDRESS 0x38
 #define REGISTER_SIZE 0x25
 
@@ -221,6 +226,8 @@ void setup() {
         delay(10);
     }
     Serial.begin(115200);
+    Wire.setSDA(PIN_SDA);
+    Wire.setSCL(PIN_SCL);
     
     Serial.println("POST Reader I2C - Interactive Mode");
     printHelp();
