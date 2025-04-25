@@ -4,6 +4,19 @@
 #define SLAVE_ADDRESS 0x38
 #define REGISTER_SIZE 0x25
 
+#define CTRL_C 3
+
+// State machine states
+enum State {
+    STATE_RETURN_TO_REPL,
+    STATE_REPL,
+    STATE_POST_MONITOR,
+    STATE_I2C_SCAN
+};
+
+State currentState = STATE_REPL;
+String inputBuffer = "";
+
 typedef struct {
     uint8_t address;
     const char *name;
@@ -93,16 +106,16 @@ void scanForAvailableDevices() {
         const char *deviceName = getDeviceNameForAddress(addr);
         if (error == 0)
         {
-            Serial.printf("I2C device found at address 0x%02x [%s]\n", addr, deviceName);
+            Serial.printf("I2C device found at address 0x%02x [%s]\r\n", addr, deviceName);
             nDevices++;
         }
         else if (error == 4)
         {
-            Serial.printf("Unknown error at address 0x%02x [%s]\n", addr, deviceName);
+            Serial.printf("Unknown error at address 0x%02x [%s]\r\n", addr, deviceName);
         }
     }
     if (nDevices > 0)
-        Serial.printf("Found %d devices on I2C Bus\n", nDevices);
+        Serial.printf("Found %d devices on I2C Bus\r\n", nDevices);
     else
         Serial.println("No devices found on I2C bus...");
 
@@ -114,31 +127,75 @@ void setupMax6958ASlave() {
     Serial.println("POST Monitor (I2C Slave as MAX6958A) started");
     Wire.begin(SLAVE_ADDRESS);
     Wire.onReceive(receiveEvent);
-    Serial.printf("Slave Address: 0x%02x\n", SLAVE_ADDRESS);
+    Serial.printf("Slave Address: 0x%02x\r\n", SLAVE_ADDRESS);
+}
+
+void printHelp() {
+    Serial.println("\r\nAvailable commands:");
+    Serial.println("  post    - Start POST code monitoring");
+    Serial.println("  scan    - Scan for I2C devices");
+    Serial.println("  help    - Show this help message");
+    Serial.println("  CTRL+C  - Exit current mode and return to REPL");
+}
+
+void handleRepl() {
+    if (Serial.available()) {
+        char c = Serial.read();
+        
+        // Echo character in REPL mode
+        if (currentState == STATE_REPL && isalpha(c)) {
+            Serial.write(c);
+        }
+        
+        // Handle newline
+        if (c == '\n' || c == '\r') {
+            Serial.println("");
+            if (inputBuffer.length() > 0) {
+                inputBuffer.trim();
+                if (inputBuffer == "post") {
+                    currentState = STATE_POST_MONITOR;
+                    setupMax6958ASlave();
+                    Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
+                } else if (inputBuffer == "scan") {
+                    currentState = STATE_I2C_SCAN;
+                } else if (inputBuffer == "help") {
+                    printHelp();
+                } else {
+                    Serial.println("Unknown command. Type 'help' for available commands.");
+                }
+                inputBuffer = "";
+            }
+            if (currentState == STATE_REPL) {
+                Serial.print(">> ");  // REPL prompt after command
+            }
+        } else if (isalpha(c)) {
+            inputBuffer += c;
+        }
+    }
 }
 
 void setup() {
+    // Wait for serial to be ready
     while (!Serial) {
         delay(10);
     }
     Serial.begin(115200);
-
-    scanForAvailableDevices();
-
-    Serial.println("");
-    setupMax6958ASlave();
+    
+    Serial.println("POST Reader I2C - Interactive Mode");
+    printHelp();
+    Serial.print(">> ");  // Initial REPL prompt
 }
 
 void printRegisters() {
     Serial.println(">> REGISTERS");
     for (int i = 0; i < REGISTER_SIZE; i++) {
         int val = registers[i];
-        Serial.printf("REG 0x%02X : 0x%02X\n", i, val);
+        Serial.printf("REG 0x%02X : 0x%02X\r\n", i, val);
     }
 }
 
 void printCode() {
-    Serial.printf("CODE (SEG: 0x%02x): 0x%x%x%x%x\n",
+    Serial.printf("CODE (SEG: 0x%02x): 0x%x%x%x%x\r\n",
         registers[Segments],
         registers[Digit3],
         registers[Digit2],
@@ -148,12 +205,44 @@ void printCode() {
 }
 
 void loop() {
-    if (newData) {
-        // printRegisters();
-        newData = false;
+    switch (currentState) {
+        case STATE_RETURN_TO_REPL:
+            // Shutdown I2C Slave, in case we were in POST monitoring before
+            Wire.end();
+
+            currentState = STATE_REPL;
+            Serial.println("Returning to REPL...");
+            printHelp();
+            Serial.print(">> ");  // REPL prompt after returning
+            break;
+
+        case STATE_REPL:
+            handleRepl();
+            break;
+            
+        case STATE_POST_MONITOR:
+            if (newData) {
+                newData = false;
+            }
+            if (newCode) {
+                printCode();
+                newCode = false;
+            }
+            break;
+            
+        case STATE_I2C_SCAN:
+            scanForAvailableDevices();
+            // After scan, jump right back into REPL
+            currentState = STATE_RETURN_TO_REPL;
+            break;
     }
-    if (newCode) {
-        printCode();
-        newCode = false;
+
+    // Check for CTRL+C
+    if (currentState != STATE_RETURN_TO_REPL
+        && currentState != STATE_REPL
+        && Serial.available()
+        && Serial.read() == CTRL_C
+    ) {
+        currentState = STATE_RETURN_TO_REPL;
     }
 } 
