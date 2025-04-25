@@ -28,15 +28,29 @@ typedef struct {
 } I2cDevice, *PI2cDevice;
 
 I2cDevice KnownDevices[] = {
-    // OG Xbox One (PHAT) 
-    {0x15, "V_NBCORE (U5F3)"},
-    {0x16, "V5_P0 (U3E2)"},
-    {0x18, "V_MEMIOAB (U9F3 or U9F2)"},
-    {0x19, "V_MEMIOCD (U6C1)"},
-    {0x20, "V_GFXCORE / V_CPUCORE (U9C2)"},
+    {0x15, "V_NBCORE"},
+    {0x16, "V5_P0"},
+    {0x18, "V_MEMIOAB"},
+    {0x19, "V_MEMIOCD"},
+    {0x20, "V_GFXCORE / V_CPUCORE"},
+    {0x21, "V_MEMPHY/V_MEMIO/V_SOC"},
+    {0x24, "GPIO EXPANDER (UNUSED)"},
+
+    {0x2D, "V_DRAM1P8 DEBUG (UNUSED)"},
+    {0x2E, "V_SOC1P8 DEBUG (UNUSED)"},
+    {0x2F, "V_SOCPHY DEBUG (UNUSED)"},
+
+    {0x40, "RAMVPP MONITOR (UNUSED)"},
+    {0x41, "M2 MONITOR (UNUSED)"},
+    {0x42, "CFEXPRESS MONITOR (UNUSED)"},
+    {0x44, "12P0 MONITOR (UNUSED)"},
+    {0x4A, "V_SOC1P8 MONITOR (UNUSED)"},
+    {0x4B, "V_SOCPHY MONITOR (UNUSED)"},
+
     {0x38, "MAX6958/9A"},
     {0x39, "MAX6958/9B"},
-    {0x5A, "RF Unit"},
+    
+    {0x5A, "RF Unit (ISD9160)"},
     {NULL, NULL}
 };
 
