@@ -49,6 +49,7 @@ I2cDevice KnownDevices[] = {
     {0x41, "M2 MONITOR (UNUSED)"},
     {0x42, "CFEXPRESS MONITOR (UNUSED)"},
     {0x44, "12P0 MONITOR (UNUSED)"},
+    {0x45, "12P0_SB MONITOR (UNUSED)"},
     {0x4A, "V_SOC1P8 MONITOR (UNUSED)"},
     {0x4B, "V_SOCPHY MONITOR (UNUSED)"},
 
