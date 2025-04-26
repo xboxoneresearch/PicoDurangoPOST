@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <cppQueue.h>
 
 // If you need to use different I/O pins for I2C, change it here
 #define PIN_SDA 0
@@ -8,6 +9,7 @@
 
 #define SLAVE_ADDRESS 0x38
 #define REGISTER_SIZE 0x25
+#define MAX_QUEUE_SIZE 30
 
 #define CTRL_C 3
 
@@ -21,6 +23,10 @@ enum State {
 
 State currentState = STATE_REPL;
 String inputBuffer = "";
+uint8_t registers[REGISTER_SIZE];
+
+// Create a queue for POST codes
+cppQueue	postCodeQueue(sizeof(uint16_t), MAX_QUEUE_SIZE, FIFO);
 
 typedef struct {
     uint16_t code;
@@ -84,25 +90,66 @@ enum MAX6958Registers {
     Segments = 0x24
 };
 
-uint8_t registers[REGISTER_SIZE];
-bool newData = false;
-uint16_t currentCode = 0;
+const char *getNameForRegister(uint8_t reg) {
+    switch(reg) {
+        case NoOp:
+            return "NoOp";
+        case DecodeMode:
+            return "DecodeMode";
+        case Intensity:
+            return "Intensity";
+        case ScanLimit:
+            return "ScanLimit";
+        case Configuration:
+            return "Configuration";
+        case FactoryReserved:
+            return "FactoryReserved";
+        case GpIo:
+            return "GpIo";
+        case DisplayTest:
+            return "DisplayTest";
+        case ReadKeyDebounced:
+            return "ReadKeyDebounced";
+        case ReadKeyPressed:
+            return "ReadKeyPressed";
+        case Digit0:
+            return "Digit0";
+        case Digit1:
+            return "Digit1";
+        case Digit2:
+            return "Digit2";
+        case Digit3:
+            return "Digit3";
+        case Segments:
+            return "Segments";
+        default:
+            return "<UNKNOWN>";
+    }
+}
 
 void receiveEvent(int howMany) {
     int reg = -1;
     while (Wire.available() && reg < REGISTER_SIZE) {
-        if (reg == -1) {
+        if (reg == -1 || reg == FactoryReserved) {
             // First byte of a packet is the CMD / target register address
+            // NOTE: Register Configuration (0x04) is always sent alone
+            // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
             reg = Wire.read();
         } else {
             registers[reg] = Wire.read();
+            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForRegister(reg), reg, registers[reg]);
             if (reg == Segments) {
                 // Signal that we have a new POST code
-                currentCode = 0;
-                currentCode |= registers[Digit0] & 0x0F;
-                currentCode |= (registers[Digit1] & 0x0F) << 4;
-                currentCode |= (registers[Digit2] & 0x0F) << 8;
-                currentCode |= (registers[Digit3] & 0x0F) << 12;
+                uint16_t code = 0;
+                code |= registers[Digit0] & 0x0F;
+                code |= (registers[Digit1] & 0x0F) << 4;
+                code |= (registers[Digit2] & 0x0F) << 8;
+                code |= (registers[Digit3] & 0x0F) << 12;
+                
+                // Add code to queue if it's not full
+                if (!postCodeQueue.isFull()) {
+                    postCodeQueue.push((uint16_t *)&code);
+                }
             }
             // After each byte the target register address is automatically incremented
             // This allow communication to be more dense
@@ -110,7 +157,6 @@ void receiveEvent(int howMany) {
             reg++;
         }
     }
-    newData = true;
 }
 
 const char* getNameForPostcode(uint16_t code) {
@@ -252,11 +298,13 @@ void printCode(uint16_t code) {
     );
 
     if (name != NULL) {
-        Serial.printf(" [%s]\r\n", name);
-    } else {
-        Serial.println();
+        Serial.printf(" [%s]", name);
     }
+
+    Serial.println();
 }
+
+uint16_t code = 0;
 
 void loop() {
     switch (currentState) {
@@ -275,12 +323,10 @@ void loop() {
             break;
             
         case STATE_POST_MONITOR:
-            if (newData) {
-                newData = false;
-            }
-            if (currentCode != 0) {
-                printCode(currentCode);
-                currentCode = 0;
+            // Process all codes in the queue
+            while (!postCodeQueue.isEmpty()) {
+                if(postCodeQueue.pop((uint16_t*)&code))
+                    printCode(code);
             }
             break;
             
