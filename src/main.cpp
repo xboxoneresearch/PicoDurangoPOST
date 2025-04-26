@@ -200,12 +200,12 @@ void scanForAvailableDevices() {
         const char *deviceName = getDeviceNameForAddress(addr);
         if (error == 0)
         {
-            Serial.printf("I2C device found at address 0x%02x [%s]\r\n", addr, deviceName);
+            Serial.printf("- Address: %i (hex: 0x%02x) [%s]\r\n", addr, addr, deviceName);
             nDevices++;
         }
         else if (error == 4)
         {
-            Serial.printf("Unknown error at address 0x%02x [%s]\r\n", addr, deviceName);
+            Serial.printf("! Unknown error at address 0x%02x [%s]\r\n", addr, deviceName);
         }
     }
     if (nDevices > 0)
