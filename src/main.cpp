@@ -129,11 +129,12 @@ const char *getNameForRegister(uint8_t reg) {
 
 void receiveEvent(int howMany) {
     int reg = -1;
-    while (Wire.available() && reg < REGISTER_SIZE) {
-        if (reg == -1 || reg == FactoryReserved) {
+    while (Wire.available()) {
+        if (reg == -1 || reg == FactoryReserved || reg == REGISTER_SIZE) {
             // First byte of a packet is the CMD / target register address
             // NOTE: Register Configuration (0x04) is always sent alone
             // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
+            // If Register is > REGISTER_SIZE, also expect a new packet following
             reg = Wire.read();
         } else {
             registers[reg] = Wire.read();
