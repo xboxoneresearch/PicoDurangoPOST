@@ -13,7 +13,7 @@ Interpretation of the values? That's not figured out yet lol
 
 ## Connections
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > With version v0.1.3, pin assignments for I2C got changed to GP0/GP1, to be in-sync with the pins used by [DuRFUnitI2C](https://github.com/xboxoneresearch/DuRFUnitI2C).
 > Before that I2C was on GP4/GP5.
 
@@ -22,6 +22,8 @@ Pi Pico -> FACET
 - SDA: Pi Pico Pin 0 (GP0) -> FACET Pin 26
 - SCL: Pi Pico Pin 1 (GP1) -> FACET Pin 25
 - GND -> GND
+
+![Pi Pico Facet I2C connection diagram](./assets/connection_diagram.png)
 
 ## Usage
 
