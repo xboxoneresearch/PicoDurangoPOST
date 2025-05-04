@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <cppQueue.h>
 #include "display.h"
+#include "version.h"
 
 // If you need to use different I/O pins for I2C, change it here
 #define PIN_SDA_XBOX 0 // GPIO0
@@ -251,6 +252,11 @@ void printHelp() {
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
 }
 
+void print(const char* header, const char *text, int durationMs = 0) {
+    Serial.printf("%s: %s\r\n", header, text);
+    display.printMessage(header, text, durationMs);
+}
+
 void handleRepl() {
     if (Serial.available()) {
         char c = Serial.read();
@@ -276,6 +282,7 @@ void handleRepl() {
                         ? DISP_ROTATION_PORTRAIT
                         : DISP_ROTATION_LANDSCAPE
                     );
+                    print("Notice", "Display rotated");
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -303,7 +310,10 @@ void setup() {
 
     if (display.setup()) {
         Serial.println("SSD1306 Display detected :)");
+    } else {
+        Serial.println("No display detected :(");
     }
+    print("Firmware", __FW_VERSION__, 1000);
     
     Serial.println("POST Reader I2C");
     startPostMonitor();

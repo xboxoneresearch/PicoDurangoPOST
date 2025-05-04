@@ -1,6 +1,5 @@
 
 #include "display.h"
-#include "version.h"
 
 char *codeBuf = (char *) calloc(5, 0);
 
@@ -23,15 +22,6 @@ bool Display::setup() {
     {
         display.clearDisplay();
         display.setTextColor(SSD1306_WHITE);
-        display.setRotation(DISP_ROTATION_LANDSCAPE);
-
-        display.setTextSize(2);
-        display.printf("FW %s", __FW_VERSION__);
-
-        display.display();
-        sleep_ms(1000);
-        display.clearDisplay();
-
         display.setRotation(currentRotation);
 
         initialized = true;
@@ -40,7 +30,34 @@ bool Display::setup() {
     return initialized;
 }
 
+void Display::printMessage(const char* header, const char *text, int durationMs) {
+    if (!initialized) {
+        return;
+    }
+
+    clear();
+    display.setRotation(DISP_ROTATION_LANDSCAPE);
+
+    display.setTextSize(1);
+    printCenteredH((char *)header);
+    display.println();
+    display.println();
+    printCenteredH((char *)text);
+    display.display();
+
+    if (durationMs > 0) {
+        sleep_ms(durationMs);
+        display.clearDisplay();
+    }
+
+    display.setRotation(currentRotation);
+}
+
 void Display::printCentered(const char *text, int16_t x, int16_t y) {
+    if (!initialized) {
+        return;
+    }
+
     int16_t x1, y1;
     uint16_t w, h;
 
@@ -58,6 +75,10 @@ void Display::printCentered(const char *text, int16_t x, int16_t y) {
 }
 
 void Display::printCenteredH(char *text, int16_t x, int16_t y) {
+    if (!initialized) {
+        return;
+    }
+
     int16_t x1, y1;
     uint16_t w, h;
 

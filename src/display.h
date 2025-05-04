@@ -45,6 +45,7 @@ public:
         display.clearDisplay();
     }
 
+    void printMessage(const char *header, const char *text, int durationMs = 1000);
     void printCentered(const char *text, int16_t x = 0, int16_t y = 0);
     void printCenteredH(char *text, int16_t x = 0, int16_t y = 0);
     void updateDisplayRotation(DisplayRotation rotation);
