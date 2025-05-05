@@ -25,6 +25,13 @@ Pi Pico -> FACET
 
 ![Pi Pico Facet I2C connection diagram](./assets/connection_diagram.png)
 
+### Optional: 0.91" OLED Display (SSD1306)
+
+- Pi Pico 3V3 -> Display VCC
+- SDA: Pi Pico Pin  9 (GP6) -> Display Pin SDA
+- SCL: Pi Pico Pin 10 (GP7) -> Display Pin SCL
+- GND -> GND
+
 ## Usage
 
 - Flash/Copy *.uf2 onto Pi Pico
