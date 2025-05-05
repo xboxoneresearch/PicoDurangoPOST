@@ -44,6 +44,11 @@ enum State {
 };
 
 typedef struct {
+    uint8_t digits[4];
+    uint8_t segments;
+} SegmentData, *PSegmentData;
+
+typedef struct {
     uint16_t code;
     const char *name;
 } PostCode, *PPostCode;

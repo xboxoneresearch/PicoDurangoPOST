@@ -111,7 +111,7 @@ void Display::updateDisplayRotation(DisplayRotation rotation) {
     currentRotation = rotation;
 }
 
-void Display::printCode(uint16_t code, const char *name) {
+void Display::printCode(uint16_t code, uint8_t segment, const char *name) {
     if (!initialized) {
         return;
     }

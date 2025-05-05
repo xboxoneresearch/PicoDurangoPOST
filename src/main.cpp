@@ -2,15 +2,24 @@
 #include "common.h"
 #include "display.h"
 
-uint16_t code = 0;
+SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
 String inputBuffer = "";
 uint8_t registers[MAX6958_REGISTER_SIZE];
 
 // Create a queue for POST codes
-cppQueue	postCodeQueue(sizeof(uint16_t), POST_MAX_QUEUE_SIZE, FIFO);
+cppQueue	postCodeQueue(sizeof(SegmentData), POST_MAX_QUEUE_SIZE, FIFO);
 Display     display(DISP_SCREEN_WIDTH, DISP_SCREEN_HEIGHT, PIN_SDA_DISP, PIN_SCL_DISP, SSD1306_DISP_ADDRESS, &Wire1);
+
+uint16_t segmentDigitsToCode(SegmentData *segData) {
+    uint16_t code = 0;
+    code |= segData->digits[0] & 0x0F;
+    code |= (segData->digits[1] & 0x0F) << 4;
+    code |= (segData->digits[2] & 0x0F) << 8;
+    code |= (segData->digits[3] & 0x0F) << 12;
+    return code;
+}
 
 void receiveEvent(int howMany) {
     int reg = -1;
@@ -26,15 +35,16 @@ void receiveEvent(int howMany) {
             // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
             if (reg == Segments) {
                 // Signal that we have a new POST code
-                uint16_t code = 0;
-                code |= registers[Digit0] & 0x0F;
-                code |= (registers[Digit1] & 0x0F) << 4;
-                code |= (registers[Digit2] & 0x0F) << 8;
-                code |= (registers[Digit3] & 0x0F) << 12;
+                SegmentData segData = {0};
+                segData.segments  = registers[Segments];
+                segData.digits[0] = registers[Digit0];
+                segData.digits[1] = registers[Digit1];
+                segData.digits[2] = registers[Digit2];
+                segData.digits[3] = registers[Digit3];
                 
                 // Add code to queue if it's not full
                 if (!postCodeQueue.isFull()) {
-                    postCodeQueue.push((uint16_t *)&code);
+                    postCodeQueue.push((SegmentData *)&segData);
                 }
             }
             // After each byte the target register address is automatically incremented
@@ -79,10 +89,10 @@ void scanForAvailableDevices() {
 
 void setupMax6958ASlave() {
     // As I2C Slave, simulate MAX6958
-    Serial.println("POST Monitor (I2C Slave as MAX6958A) started");
+    Serial.println("POST Monitor started");
     Wire.begin(MAX6958_ADDRESS);
     Wire.onReceive(receiveEvent);
-    Serial.printf("Slave Address: 0x%02x\r\n", MAX6958_ADDRESS);
+    DBG("Slave Address: 0x%02x\r\n", MAX6958_ADDRESS);
 }
 
 void printHelp() {
@@ -143,12 +153,12 @@ void printRegisters() {
     }
 }
 
-void printCode(uint16_t code) {
+void printCode(uint16_t code, uint8_t segment) {
     const char *name = getNameForPostcode(code);
 
-    display.printCode(code, name);
+    display.printCode(code, segment, name);
     Serial.printf("CODE (SEG: 0x%02x): 0x%04x",
-        registers[Segments],
+        segment,
         code
     );
 
@@ -211,8 +221,10 @@ void loop() {
 
             // Process all codes in the queue
             while (!postCodeQueue.isEmpty()) {
-                if(postCodeQueue.pop((uint16_t*)&code))
-                    printCode(code);
+                if(postCodeQueue.pop((SegmentData*)&currentSegData)) {
+                    uint16_t code = segmentDigitsToCode(&currentSegData);
+                    printCode(code, currentSegData.segments);
+                }
             }
             break;
             
