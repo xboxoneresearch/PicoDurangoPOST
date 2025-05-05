@@ -38,7 +38,8 @@ enum State {
     STATE_RETURN_TO_REPL,
     STATE_REPL,
     STATE_POST_MONITOR,
-    STATE_I2C_SCAN
+    STATE_I2C_SCAN,
+    STATE_DISPLAY_ROTATE
 };
 
 typedef struct {

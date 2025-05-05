@@ -2,6 +2,8 @@
 #include "common.h"
 #include "display.h"
 
+uint16_t code = 0;
+bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
 String inputBuffer = "";
 uint8_t registers[MAX6958_REGISTER_SIZE];
@@ -83,12 +85,6 @@ void setupMax6958ASlave() {
     Serial.printf("Slave Address: 0x%02x\r\n", MAX6958_ADDRESS);
 }
 
-void startPostMonitor() {
-    display.clear();
-    setupMax6958ASlave();
-    Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
-}
-
 void printHelp() {
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
@@ -119,16 +115,10 @@ void handleRepl() {
                 inputBuffer.trim();
                 if (inputBuffer == "post") {
                     currentState = STATE_POST_MONITOR;
-                    startPostMonitor();
                 } else if (inputBuffer == "scan") {
                     currentState = STATE_I2C_SCAN;
                 } else if (inputBuffer == "rotate") {
-                    display.updateDisplayRotation(
-                        display.isDisplayLandscape()
-                        ? DISP_ROTATION_PORTRAIT
-                        : DISP_ROTATION_LANDSCAPE
-                    );
-                    print("Notice", "Display rotated");
+                    currentState = STATE_DISPLAY_ROTATE;
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -186,16 +176,16 @@ void setup() {
     print("Firmware", __FW_VERSION__, 1000);
     
     Serial.println("POST Reader I2C");
-    startPostMonitor();
 }
-
-uint16_t code = 0;
 
 void loop() {
     switch (currentState) {
         case STATE_RETURN_TO_REPL:
             // Shutdown I2C Slave, in case we were in POST monitoring before
-            Wire.end();
+            if (postMonitorRunning) {
+                postMonitorRunning = false;
+                Wire.end();
+            }
 
             currentState = STATE_REPL;
             Serial.println("Returning to REPL...");
@@ -206,8 +196,15 @@ void loop() {
         case STATE_REPL:
             handleRepl();
             break;
-            
+        
         case STATE_POST_MONITOR:
+            if (!postMonitorRunning) {
+                postMonitorRunning = true;
+                display.clear();
+                setupMax6958ASlave();
+                Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
+            }
+
             // Process all codes in the queue
             while (!postCodeQueue.isEmpty()) {
                 if(postCodeQueue.pop((uint16_t*)&code))
@@ -218,6 +215,15 @@ void loop() {
         case STATE_I2C_SCAN:
             scanForAvailableDevices();
             // After scan, jump right back into REPL
+            currentState = STATE_RETURN_TO_REPL;
+            break;
+        case STATE_DISPLAY_ROTATE:
+            display.updateDisplayRotation(
+                display.isDisplayLandscape()
+                ? DISP_ROTATION_PORTRAIT
+                : DISP_ROTATION_LANDSCAPE
+            );
+            print("Notice", "Display rotated");
             currentState = STATE_RETURN_TO_REPL;
             break;
     }
