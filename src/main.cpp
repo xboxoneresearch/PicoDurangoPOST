@@ -1,8 +1,6 @@
-#include <Arduino.h>
-#include <Wire.h>
 #include <cppQueue.h>
+#include "common.h"
 #include "display.h"
-#include "version.h"
 
 // If you need to use different I/O pins for I2C, change it here
 #define PIN_SDA_XBOX 0 // GPIO0

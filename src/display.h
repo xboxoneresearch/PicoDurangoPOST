@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include <Adafruit_SSD1306.h>
 
 enum DisplayRotation {
@@ -12,16 +11,24 @@ enum DisplayRotation {
 
 class Display {
 public:
-    Display(
-        uint8_t displayWidth,
-        uint8_t displayHeight,
-        uint8_t sdaPin,
-        uint8_t sclPin,
-        uint8_t i2cAddress,
-        TwoWire *wire
-    );
-    ~Display();
+    Display(uint8_t displayWidth, uint8_t displayHeight, uint8_t sdaPin, uint8_t sclPin, uint8_t i2cAddress, TwoWire *wire) {
+        twoWirePort = wire;
+        sda = sdaPin;
+        scl = sclPin;
+        address = i2cAddress;
+        width = displayWidth;
+        height = displayHeight;
+        currentRotation = DISP_ROTATION_LANDSCAPE;
+        display = Adafruit_SSD1306(width, height, twoWirePort, -1);
+        codeBuf = (char *) calloc(5, 0);
+    }
+    ~Display() {
+        if (codeBuf != NULL) {
+            free(codeBuf);
+        }
+    }
     bool setup();
+
     DisplayRotation getCurrentRotation() {
         return currentRotation;
     }
@@ -60,4 +67,5 @@ private:
     DisplayRotation currentRotation;
     Adafruit_SSD1306 display;
     bool initialized = false;
+    char *codeBuf = NULL;
 };

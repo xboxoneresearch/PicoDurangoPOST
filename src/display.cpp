@@ -1,33 +1,31 @@
 
+#include "common.h"
 #include "display.h"
-
-char *codeBuf = (char *) calloc(5, 0);
-
-Display::Display(uint8_t displayWidth, uint8_t displayHeight, uint8_t sdaPin, uint8_t sclPin, uint8_t i2cAddress, TwoWire *wire) {
-    twoWirePort = wire;
-    sda = sdaPin;
-    scl = sclPin;
-    address = i2cAddress;
-    width = displayWidth;
-    height = displayHeight;
-    currentRotation = DISP_ROTATION_LANDSCAPE;
-    display = Adafruit_SSD1306(width, height, twoWirePort, -1);
-}
 
 bool Display::setup() {
     Wire1.setSDA(sda);
     Wire1.setSCL(scl);
+ 
+    Wire1.begin();
+    Wire1.beginTransmission(address);
+    auto err = Wire1.endTransmission();
+    Wire1.end();
 
-    if (display.begin(SSD1306_SWITCHCAPVCC, address))
-    {
-        display.clearDisplay();
-        display.setTextColor(SSD1306_WHITE);
-        display.setRotation(currentRotation);
-
-        initialized = true;
+    if (err != 0) {
+        // Device not reachable
+        DBG("Display error: %i", err);
+        return false;
+    } else if (!display.begin(SSD1306_SWITCHCAPVCC, address)) {
+        DBG("Failed to initialize / allocate data for display");
+        return false;
     }
 
-    return initialized;
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setRotation(currentRotation);
+
+    initialized = true;
+    return true;
 }
 
 void Display::printMessage(const char* header, const char *text, int durationMs) {
