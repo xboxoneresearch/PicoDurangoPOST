@@ -160,10 +160,14 @@ void printCode(uint16_t code) {
 }
 
 void setup() {
-    // Wait for serial to be ready
+#if WAIT_FOR_SERIAL
+    // Wait for serial to be connected
+    // before continuing with setup
     while (!Serial) {
         delay(10);
     }
+#endif
+
     Serial.begin(115200);
     Wire.setSDA(PIN_SDA_XBOX);
     Wire.setSCL(PIN_SCL_XBOX);

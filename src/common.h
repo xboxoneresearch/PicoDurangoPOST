@@ -4,7 +4,8 @@
 #include <Wire.h>
 #include "version.h"
 
-#define __DEBUG__
+#define DEBUG           0
+#define WAIT_FOR_SERIAL 0
 
 // If you need to use different I/O pins for I2C, change it here
 #define PIN_SDA_XBOX 0 // GPIO0
@@ -27,7 +28,7 @@
 
 #define CTRL_C 3
 
-#if defined(__DEBUG__)
+#if DEBUG
 #define DBG(format, ...) Serial.printf("[DBG] "#format"\r\n", ##__VA_ARGS__)
 #else
 #define DBG(x, ...)
