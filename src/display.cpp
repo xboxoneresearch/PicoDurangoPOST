@@ -3,13 +3,13 @@
 #include "display.h"
 
 bool Display::setup() {
-    Wire1.setSDA(sda);
-    Wire1.setSCL(scl);
+    twoWirePort->setSDA(sda);
+    twoWirePort->setSCL(scl);
  
-    Wire1.begin();
-    Wire1.beginTransmission(address);
-    auto err = Wire1.endTransmission();
-    Wire1.end();
+    twoWirePort->begin();
+    twoWirePort->beginTransmission(address);
+    auto err = twoWirePort->endTransmission();
+    twoWirePort->end();
 
     if (err != 0) {
         // Device not reachable
