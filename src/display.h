@@ -3,10 +3,13 @@
 #include <Adafruit_SSD1306.h>
 
 enum DisplayRotation {
+#if !MIRROR_DISPLAY_ROTATION
     DISP_ROTATION_LANDSCAPE = 0,
     DISP_ROTATION_PORTRAIT = 1,
-    DISP_ROTATION_LANDSCAPE_ROTATED = 2,
-    DISP_ROTATION_PORTRAIT_ROTATED = 3,
+#else
+    DISP_ROTATION_LANDSCAPE = 2,
+    DISP_ROTATION_PORTRAIT = 3,
+#endif
 };
 
 class Display {
@@ -34,16 +37,18 @@ public:
     }
     
     bool isDisplayLandscape() {
-        return (
-            currentRotation == DISP_ROTATION_LANDSCAPE
-            || currentRotation == DISP_ROTATION_LANDSCAPE_ROTATED
-        );
+        return (currentRotation == DISP_ROTATION_LANDSCAPE);
     }
     
     bool isDisplayPortrait() {
-        return (
-            currentRotation == DISP_ROTATION_PORTRAIT
-            || currentRotation == DISP_ROTATION_PORTRAIT_ROTATED
+        return (currentRotation == DISP_ROTATION_PORTRAIT);
+    }
+
+    void toggleRotation() {
+        updateDisplayRotation(
+            isDisplayLandscape()
+            ? DISP_ROTATION_PORTRAIT
+            : DISP_ROTATION_LANDSCAPE
         );
     }
 

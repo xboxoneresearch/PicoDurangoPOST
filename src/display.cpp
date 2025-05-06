@@ -1,6 +1,5 @@
 
 #include "common.h"
-#include "display.h"
 
 bool Display::setup() {
     twoWirePort->setSDA(sda);

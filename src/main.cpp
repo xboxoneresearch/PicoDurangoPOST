@@ -1,16 +1,88 @@
 #include <cppQueue.h>
 #include "common.h"
-#include "display.h"
 
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
 String inputBuffer = "";
 uint8_t registers[MAX6958_REGISTER_SIZE];
+char *codeName = (char*)calloc(1, 255);
 
 // Create a queue for POST codes
 cppQueue	postCodeQueue(sizeof(SegmentData), POST_MAX_QUEUE_SIZE, FIFO);
 Display     display(DISP_SCREEN_WIDTH, DISP_SCREEN_HEIGHT, PIN_SDA_DISP, PIN_SCL_DISP, SSD1306_DISP_ADDRESS, &Wire1);
+
+char *postCodeToName(uint16_t code) {
+    uint8_t loByte = code & 0xFF;
+    uint8_t hiByte = (code & 0xFF00) >> 8;
+    snprintf(codeName, 255, "\0");
+
+    if (code == 0x14FF || code == 0x0075) {
+        // Exit early with generic names
+        return (char *)"BOOT_SUCCESS";
+    }
+    
+    // Match on range 0x01xx - 0x14xx (2BL)
+    if (hiByte >= POST_2BL_STAGE_UNKNOWN && hiByte <= POST_2BL_FINAL) {
+        // Search name for 2BL stage / hi byte
+        const char *phase2BL = getNameFor2BlPhase(hiByte);
+        // Search AMD AGESA / ABL PostCode / testpoint - lo byte
+        const char *tp2BL = getNameForAblTestpoint(loByte);
+
+        snprintf(codeName, 255, "%s_%s\0", phase2BL, tp2BL);
+        return codeName;
+    }
+
+    // Match on distinct u16 codes
+    char *res = getNameForPostcode(code);
+    if (res) {
+        return res;
+    }
+
+    switch (hiByte) {
+        case POST_SMC_FATAL:
+            snprintf(
+                codeName, 255, "%s_%02x\0",
+                "SMC_FATAL_UNKNOWN",
+                loByte
+            );
+            break;
+        case POST_SMC_THERMAL:
+            snprintf(
+                codeName, 255, "%s_%02x\0",
+                "SMC_THERMAL_UNKNOWN",
+                loByte
+            );
+            break;
+        case POST_SMC_BOOT:
+            snprintf(
+                codeName, 255, "%s_%02x\0",
+                "SMC_BOOT_UNKNOWN",
+                loByte
+            );
+            break;
+        case POST_SMC_RUNTIME:
+            snprintf(
+                codeName, 255, "%s_%02x\0",
+                "SMC_RUNTIME_UNKNOWN",
+                loByte
+            );
+            break;
+        case POST_SP_UNKNOWN:
+            snprintf(
+                codeName, 255, "%s_%02x\0",
+                "SP_UNKNOWN",
+                loByte
+            );
+            break;
+    }
+
+    if (strlen(codeName) > 0) {
+        return codeName;
+    }
+
+    return NULL;
+}
 
 uint16_t segmentDigitsToCode(SegmentData *segData) {
     uint16_t code = 0;
@@ -154,7 +226,7 @@ void printRegisters() {
 }
 
 void printCode(uint16_t code, uint8_t segment) {
-    const char *name = getNameForPostcode(code);
+    char *name = getNameForPostcode(code);
 
     display.printCode(code, segment, name);
     Serial.printf("CODE (SEG: 0x%02x): 0x%04x",
@@ -178,7 +250,7 @@ void setup() {
     }
 #endif
 
-    Serial.begin(115200);
+    Serial.begin(SERIAL_BAUD);
     Wire.setSDA(PIN_SDA_XBOX);
     Wire.setSCL(PIN_SCL_XBOX);
 
@@ -234,11 +306,7 @@ void loop() {
             currentState = STATE_RETURN_TO_REPL;
             break;
         case STATE_DISPLAY_ROTATE:
-            display.updateDisplayRotation(
-                display.isDisplayLandscape()
-                ? DISP_ROTATION_PORTRAIT
-                : DISP_ROTATION_LANDSCAPE
-            );
+            display.toggleRotation();
             print("Notice", "Display rotated");
             currentState = STATE_RETURN_TO_REPL;
             break;
