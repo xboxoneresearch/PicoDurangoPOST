@@ -1,5 +1,6 @@
 #include <cppQueue.h>
 #include "common.h"
+#include "colors.h"
 
 // Used to indicate I2C scan finish from core1->core0
 #define I2C_SCAN_FINISHED 0xFF
@@ -12,10 +13,21 @@
 #define SHOULD_ENQUEUE_SEGMENT(x) (true)
 #endif
 
-// Message from core0->core1
+#define PRINT_COLOR(c, x) \
+    if (printColors) \
+        Serial.print(c); \
+    x; \
+    if (printColors) \
+        Serial.print(COLOR_RESET);
+
+
 bool showTimestamp = true;
+bool printColors = true;
+
+// Message from core0->core1
 uint32_t msg_core0 = 0;
 uint64_t timestamp = time_us_64();
+
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
@@ -121,6 +133,7 @@ void printHelp() {
     
     // Modifiers for POST monitor
     Serial.println("  ts      - Toggle showing timestamps");
+    Serial.println("  colors  - Print colors over serial");
     Serial.println("  rotate  - Rotate display");
     
     Serial.println("  help    - Show this help message");
@@ -152,6 +165,8 @@ void handleRepl() {
                     currentState = STATE_I2C_SCAN;
                 } else if (inputBuffer == "rotate") {
                     currentState = STATE_DISPLAY_ROTATE;
+                } else if (inputBuffer == "colors") {
+                    currentState = STATE_TOGGLE_COLORS;
                 } else if (inputBuffer == "ts") {
                     currentState = STATE_TOGGLE_TIMESTAMP;
                 } else if (inputBuffer == "help") {
@@ -185,20 +200,25 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     uint8_t segmentNibble = segment & 0x0F;
 
     display.printCode(code, flavor, name, segmentNibble);
-    Serial.printf("%s (%i): 0x%04x",
-        flavor,
-        segmentNibble,
-        code
-    );
+    
+    // Color is only printed if `printColors` is set
+    PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
+    Serial.print(" (");
+    PRINT_COLOR(COLOR_SEG_INDEX, Serial.print(segmentNibble));
+    Serial.print("): ");
+    PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
 
     if (name != NULL) {
-        Serial.printf(" [%s] ", name);
+        Serial.print(" [");
+        PRINT_COLOR(COLOR_NAME, Serial.print(name))
+        Serial.print("] ");
     }
 
     if (showTimestamp) {
         Serial.print("(");
-        Serial.print(timestamp / 1000.0);
-        Serial.print(" ms)");
+        PRINT_COLOR(COLOR_TIMESTAMP, Serial.print(timestamp / 1000.0))
+        Serial.print(" ms");
+        Serial.print(")");
     }
 
     Serial.println();
@@ -398,6 +418,10 @@ void loop() {
         case STATE_TOGGLE_TIMESTAMP:
             showTimestamp = !showTimestamp;
             print("Notice", "Toggled timestamps");
+            currentState = STATE_RETURN_TO_REPL;
+        case STATE_TOGGLE_COLORS:
+            printColors = !printColors;
+            print("Notice", "Toggled printing colors");
             currentState = STATE_RETURN_TO_REPL;
     }
 
