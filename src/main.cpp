@@ -226,7 +226,7 @@ void printRegisters() {
 }
 
 void printCode(uint16_t code, uint8_t segment) {
-    char *name = getNameForPostcode(code);
+    char *name = postCodeToName(code);
 
     display.printCode(code, segment, name);
     Serial.printf("CODE (SEG: 0x%02x): 0x%04x",
