@@ -110,7 +110,7 @@ void Display::updateDisplayRotation(DisplayRotation rotation) {
     currentRotation = rotation;
 }
 
-void Display::printCode(uint16_t code, uint8_t segment, const char *name) {
+void Display::printCode(uint16_t code, const char *flavor, const char *name) {
     if (!initialized) {
         return;
     }
@@ -135,12 +135,17 @@ void Display::printCode(uint16_t code, uint8_t segment, const char *name) {
 
     if (isDisplayLandscape()) {
         display.setTextSize(1);
+
         // In landscape orientation, also print POST-code name
         if (name != NULL) {
             printCenteredH((char *)name);
         } else {
             printCenteredH((char *)"UNKNOWN");
         }
+
+        display.setCursor(0,0);
+        display.print(flavor);
+
         display.setTextSize(2);
     }
     display.display();

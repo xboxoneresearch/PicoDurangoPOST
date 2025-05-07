@@ -61,7 +61,7 @@ public:
     void printCentered(const char *text, int16_t x = 0, int16_t y = 0);
     void printCenteredH(char *text, int16_t x = 0, int16_t y = 0);
     void updateDisplayRotation(DisplayRotation rotation);
-    void printCode(uint16_t code, uint8_t segment, const char *name);
+    void printCode(uint16_t code, const char *flavor, const char *name);
 private:
     TwoWire *twoWirePort;
     uint8_t width;

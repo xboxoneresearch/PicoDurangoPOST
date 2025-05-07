@@ -115,7 +115,7 @@ void receiveEvent(int howMany) {
                 segData.digits[3] = registers[Digit3];
                 
                 // Add code to queue if it's not full
-                if (!postCodeQueue.isFull()) {
+                if ((segData.segments & 0x0F) != 0 && !postCodeQueue.isFull()) {
                     postCodeQueue.push((SegmentData *)&segData);
                 }
             }
@@ -229,7 +229,7 @@ void printCode(uint16_t code, uint8_t segment) {
     char *name = postCodeToName(code);
     const char *flavor = getCodeFlavorForSegment(segment);
 
-    display.printCode(code, segment, name);
+    display.printCode(code, flavor, name);
     Serial.printf("%s (%i): 0x%04x",
         flavor,
         // Lower nibble of segment == position of code when > u16?
