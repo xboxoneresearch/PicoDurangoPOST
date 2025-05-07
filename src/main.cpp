@@ -173,12 +173,13 @@ void printRegisters() {
 void printCode(uint16_t code, uint8_t segment) {
     char *name = postCodeToName(code);
     const char *flavor = getCodeFlavorForSegment(segment);
+    // Lower nibble of segment == position of code when > u16?
+    uint8_t segmentNibble = segment & 0x0F;
 
-    display.printCode(code, flavor, name);
+    display.printCode(code, flavor, name, segmentNibble);
     Serial.printf("%s (%i): 0x%04x",
         flavor,
-        // Lower nibble of segment == position of code when > u16?
-        segment & 0x0F,
+        segmentNibble,
         code
     );
 

@@ -110,7 +110,7 @@ void Display::updateDisplayRotation(DisplayRotation rotation) {
     currentRotation = rotation;
 }
 
-void Display::printCode(uint16_t code, const char *flavor, const char *name) {
+void Display::printCode(uint16_t code, const char *flavor, const char *name, uint8_t segmentNibble) {
     if (!initialized) {
         return;
     }
@@ -143,8 +143,9 @@ void Display::printCode(uint16_t code, const char *flavor, const char *name) {
             printCenteredH((char *)"UNKNOWN");
         }
 
+        // Print Code flavor in the top-left corner
         display.setCursor(0,0);
-        display.print(flavor);
+        display.printf("%s\n(%i)", flavor, segmentNibble);
 
         display.setTextSize(2);
     }
