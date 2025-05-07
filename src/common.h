@@ -30,12 +30,14 @@ enum State {
     STATE_REPL,
     STATE_POST_MONITOR,
     STATE_I2C_SCAN,
+    STATE_TOGGLE_TIMESTAMP,
     STATE_DISPLAY_ROTATE
 };
 
 typedef struct {
     uint8_t digits[4];
     uint8_t segments;
+    uint64_t timestamp;
 } SegmentData, *PSegmentData;
 
 typedef struct {

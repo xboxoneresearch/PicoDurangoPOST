@@ -13,8 +13,9 @@
 #endif
 
 // Message from core0->core1
+bool showTimestamp = true;
 uint32_t msg_core0 = 0;
-
+uint64_t timestamp = time_us_64();
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
@@ -29,6 +30,7 @@ Display     display(DISP_SCREEN_WIDTH, DISP_SCREEN_HEIGHT, PIN_SDA_DISP, PIN_SCL
 enum CrossThreadMsg: uint32_t {
     INVALID = 0,
     SCAN_I2C = 1,
+    RESET_TIMESTAMP = 2
 };
 
 char *postCodeToName(uint16_t code) {
@@ -116,7 +118,11 @@ void printHelp() {
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
     Serial.println("  scan    - Scan for I2C devices");
+    
+    // Modifiers for POST monitor
+    Serial.println("  ts      - Toggle showing timestamps");
     Serial.println("  rotate  - Rotate display");
+    
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
 }
@@ -146,6 +152,8 @@ void handleRepl() {
                     currentState = STATE_I2C_SCAN;
                 } else if (inputBuffer == "rotate") {
                     currentState = STATE_DISPLAY_ROTATE;
+                } else if (inputBuffer == "ts") {
+                    currentState = STATE_TOGGLE_TIMESTAMP;
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -170,7 +178,7 @@ void printRegisters() {
     }
 }
 
-void printCode(uint16_t code, uint8_t segment) {
+void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     char *name = postCodeToName(code);
     const char *flavor = getCodeFlavorForSegment(segment);
     // Lower nibble of segment == position of code when > u16?
@@ -184,7 +192,13 @@ void printCode(uint16_t code, uint8_t segment) {
     );
 
     if (name != NULL) {
-        Serial.printf(" [%s]", name);
+        Serial.printf(" [%s] ", name);
+    }
+
+    if (showTimestamp) {
+        Serial.print("(");
+        Serial.print(timestamp / 1000.0);
+        Serial.print(" ms)");
     }
 
     Serial.println();
@@ -207,6 +221,8 @@ void core1_receiveI2cData(int howMany) {
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
+                // Get uS relative to last timer reset
+                segData.timestamp = time_us_64() - timestamp;
                 segData.segments  = registers[Segments];
                 segData.digits[0] = registers[Digit0];
                 segData.digits[1] = registers[Digit1];
@@ -270,6 +286,10 @@ void loop1() {
                 Wire.begin(MAX6958_ADDRESS);
                 Wire.onReceive(core1_receiveI2cData);
                 break;
+            case RESET_TIMESTAMP:
+                timestamp = time_us_64();
+                postCodeQueue.clean();
+                break;
         }
     }
 }
@@ -278,12 +298,16 @@ void loop1() {
 
 /* CORE 0 START */
 
+inline void sendMessageToCore1(CrossThreadMsg msg) {
+    rp2040.fifo.push_nb(msg);
+}
+
 void scanForAvailableDevices() {
     int error = 0;
     int nDevices = 0;
     // Instruct core1 to scan for available devices on the bus
     Serial.println("Scanning for I2C devices...");
-    rp2040.fifo.push_nb(SCAN_I2C);
+    sendMessageToCore1(SCAN_I2C);
     sleep_ms(1000);
 
     uint32_t address = 0;
@@ -343,15 +367,20 @@ void loop() {
         case STATE_POST_MONITOR:
             if (!postMonitorRunning) {
                 postMonitorRunning = true;
+                sendMessageToCore1(RESET_TIMESTAMP);
                 display.clear();
                 Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
+            }
+
+            if (Serial.peek() == 'r') {
+                sendMessageToCore1(RESET_TIMESTAMP);
             }
 
             // Process all codes in the queue
             while (!postCodeQueue.isEmpty()) {
                 if(postCodeQueue.pop((SegmentData*)&currentSegData)) {
                     uint16_t code = segmentDigitsToCode(&currentSegData);
-                    printCode(code, currentSegData.segments);
+                    printCode(code, currentSegData.segments, currentSegData.timestamp);
                 }
             }
             break;
@@ -366,6 +395,10 @@ void loop() {
             print("Notice", "Display rotated");
             currentState = STATE_RETURN_TO_REPL;
             break;
+        case STATE_TOGGLE_TIMESTAMP:
+            showTimestamp = !showTimestamp;
+            print("Notice", "Toggled timestamps");
+            currentState = STATE_RETURN_TO_REPL;
     }
 
     // Check for CTRL+C
