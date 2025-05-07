@@ -1,6 +1,20 @@
 #include <cppQueue.h>
 #include "common.h"
 
+// Used to indicate I2C scan finish from core1->core0
+#define I2C_SCAN_FINISHED 0xFF
+
+#if true
+// Only enqueue segment if segment's lower nibble > 0
+#define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
+#else
+// Enqueue every segment
+#define SHOULD_ENQUEUE_SEGMENT(x) (true)
+#endif
+
+// Message from core0->core1
+uint32_t msg_core0 = 0;
+
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 State currentState = STATE_POST_MONITOR;
@@ -11,6 +25,11 @@ char *codeName = (char*)calloc(1, 255);
 // Create a queue for POST codes
 cppQueue	postCodeQueue(sizeof(SegmentData), POST_MAX_QUEUE_SIZE, FIFO);
 Display     display(DISP_SCREEN_WIDTH, DISP_SCREEN_HEIGHT, PIN_SDA_DISP, PIN_SCL_DISP, SSD1306_DISP_ADDRESS, &Wire1);
+
+enum CrossThreadMsg: uint32_t {
+    INVALID = 0,
+    SCAN_I2C = 1,
+};
 
 char *postCodeToName(uint16_t code) {
     uint8_t loByte = code & 0xFF;
@@ -93,80 +112,6 @@ uint16_t segmentDigitsToCode(SegmentData *segData) {
     return code;
 }
 
-void receiveEvent(int howMany) {
-    int reg = -1;
-    while (Wire.available()) {
-        if (reg == -1 || reg == FactoryReserved || reg == MAX6958_REGISTER_SIZE) {
-            // First byte of a packet is the CMD / target register address
-            // NOTE: Register Configuration (0x04) is always sent alone
-            // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
-            // If Register is > MAX6958_REGISTER_SIZE, also expect a new packet following
-            reg = Wire.read();
-        } else {
-            registers[reg] = Wire.read();
-            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
-            if (reg == Segments) {
-                // Signal that we have a new POST code
-                SegmentData segData = {0};
-                segData.segments  = registers[Segments];
-                segData.digits[0] = registers[Digit0];
-                segData.digits[1] = registers[Digit1];
-                segData.digits[2] = registers[Digit2];
-                segData.digits[3] = registers[Digit3];
-                
-                // Add code to queue if it's not full
-                if ((segData.segments & 0x0F) != 0 && !postCodeQueue.isFull()) {
-                    postCodeQueue.push((SegmentData *)&segData);
-                }
-            }
-            // After each byte the target register address is automatically incremented
-            // This allow communication to be more dense
-            // See: MAX6958 Datasheet, page 9 -> Command Address Autoincrementing
-            reg++;
-        }
-    }
-}
-
-void scanForAvailableDevices() {
-    Wire.begin();
-    int error = 0;
-    int nDevices = 0;
-    // As I2C Master, scan for available devices on the bus
-    Serial.println("Scanning for I2C devices...");
-    for (uint8_t addr = 1; addr < 0x7F; addr++) {
-        // The i2c_scanner uses the return value of
-        // the Write.endTransmisstion to see if
-        // a device did acknowledge to the address.
-        Wire.beginTransmission(addr);
-        error = Wire.endTransmission();
-
-        const char *deviceName = getDeviceNameForI2cAddress(addr);
-        if (error == 0)
-        {
-            Serial.printf("- Address: %i (hex: 0x%02x) [%s]\r\n", addr, addr, deviceName);
-            nDevices++;
-        }
-        else if (error == 4)
-        {
-            Serial.printf("! Unknown error at address 0x%02x [%s]\r\n", addr, deviceName);
-        }
-    }
-    if (nDevices > 0)
-        Serial.printf("Found %d devices on I2C Bus\r\n", nDevices);
-    else
-        Serial.println("No devices found on I2C bus...");
-
-    Wire.end();
-}
-
-void setupMax6958ASlave() {
-    // As I2C Slave, simulate MAX6958
-    Serial.println("POST Monitor started");
-    Wire.begin(MAX6958_ADDRESS);
-    Wire.onReceive(receiveEvent);
-    DBG("Slave Address: 0x%02x\r\n", MAX6958_ADDRESS);
-}
-
 void printHelp() {
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
@@ -244,6 +189,119 @@ void printCode(uint16_t code, uint8_t segment) {
     Serial.println();
 }
 
+/* CORE 1 START */
+
+void core1_receiveI2cData(int howMany) {
+    int reg = -1;
+    while (Wire.available()) {
+        if (reg == -1 || reg == FactoryReserved || reg == MAX6958_REGISTER_SIZE) {
+            // First byte of a packet is the CMD / target register address
+            // NOTE: Register Configuration (0x04) is always sent alone
+            // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
+            // If Register is > MAX6958_REGISTER_SIZE, also expect a new packet following
+            reg = Wire.read();
+        } else {
+            registers[reg] = Wire.read();
+            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
+            if (reg == Segments) {
+                // Signal that we have a new POST code
+                SegmentData segData = {0};
+                segData.segments  = registers[Segments];
+                segData.digits[0] = registers[Digit0];
+                segData.digits[1] = registers[Digit1];
+                segData.digits[2] = registers[Digit2];
+                segData.digits[3] = registers[Digit3];
+                
+                // Add code to queue if it's not full
+                if (SHOULD_ENQUEUE_SEGMENT(segData.segments) && !postCodeQueue.isFull()) {
+                    postCodeQueue.push((SegmentData *)&segData);
+                }
+            }
+            // After each byte the target register address is automatically incremented
+            // This allow communication to be more dense
+            // See: MAX6958 Datasheet, page 9 -> Command Address Autoincrementing
+            reg++;
+        }
+    }
+}
+
+void core1_i2cScan(TwoWire *interface) {
+    interface->begin();
+
+    // As I2C Master, scan for available devices on the bus
+    for (uint8_t addr = 1; addr < 0x7F; addr++) {
+        // The i2c_scanner uses the return value of
+        // the Write.endTransmisstion to see if
+        // a device acknowledged the transfer to the address.
+        interface->beginTransmission(addr);
+        // Check if transmission succeeded
+        // If true, device @ address is available
+        if (interface->endTransmission() == 0) {
+            rp2040.fifo.push(addr);
+        }
+    }
+    // Signal that scan is finished
+    rp2040.fifo.push(I2C_SCAN_FINISHED);
+
+    interface->end();
+}
+
+void setup1() {
+    Wire.setSDA(PIN_SDA_XBOX);
+    Wire.setSCL(PIN_SCL_XBOX);
+
+    Wire.begin(MAX6958_ADDRESS);
+    Wire.onReceive(core1_receiveI2cData);
+}
+
+void loop1() {
+    // Just handle I2C interrupts in the background or react to message from core0 to do I2C Scan
+    if (rp2040.fifo.available() && rp2040.fifo.pop_nb(&msg_core0)) {
+        switch (msg_core0) {
+            case SCAN_I2C:
+                // Stop I2C slave
+                Wire.end();
+
+                // Do I2C scan as master
+                core1_i2cScan(&Wire);
+
+                // Start slave operation again
+                Wire.begin(MAX6958_ADDRESS);
+                Wire.onReceive(core1_receiveI2cData);
+                break;
+        }
+    }
+}
+
+/* CORE 1 START */
+
+/* CORE 0 START */
+
+void scanForAvailableDevices() {
+    int error = 0;
+    int nDevices = 0;
+    // Instruct core1 to scan for available devices on the bus
+    Serial.println("Scanning for I2C devices...");
+    rp2040.fifo.push_nb(SCAN_I2C);
+    sleep_ms(1000);
+
+    uint32_t address = 0;
+    // Get enumerated addresses from core1 until "SCAN_FINISHED" is signaled
+    while (rp2040.fifo.pop_nb(&address) && address != I2C_SCAN_FINISHED) {
+        uint8_t addr_u8 = address & 0xFF;
+        const char *deviceName = getDeviceNameForI2cAddress(addr_u8);
+
+        Serial.printf("- Address: %i (hex: 0x%02x) [%s]\r\n", addr_u8, addr_u8, deviceName);
+        nDevices++;
+    }
+
+    if (nDevices > 0)
+        Serial.printf("Found %d devices on I2C Bus\r\n", nDevices);
+    else
+        Serial.println("No devices found on I2C bus...");
+}
+
+
 void setup() {
 #if WAIT_FOR_SERIAL
     // Wait for serial to be connected
@@ -254,9 +312,6 @@ void setup() {
 #endif
 
     Serial.begin(SERIAL_BAUD);
-    Wire.setSDA(PIN_SDA_XBOX);
-    Wire.setSCL(PIN_SCL_XBOX);
-
     if (display.setup()) {
         Serial.println("SSD1306 Display detected :)");
     } else {
@@ -270,10 +325,8 @@ void setup() {
 void loop() {
     switch (currentState) {
         case STATE_RETURN_TO_REPL:
-            // Shutdown I2C Slave, in case we were in POST monitoring before
             if (postMonitorRunning) {
                 postMonitorRunning = false;
-                Wire.end();
             }
 
             currentState = STATE_REPL;
@@ -290,7 +343,6 @@ void loop() {
             if (!postMonitorRunning) {
                 postMonitorRunning = true;
                 display.clear();
-                setupMax6958ASlave();
                 Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
             }
 
@@ -323,4 +375,6 @@ void loop() {
     ) {
         currentState = STATE_RETURN_TO_REPL;
     }
-} 
+}
+
+/* CORE 0 END */
