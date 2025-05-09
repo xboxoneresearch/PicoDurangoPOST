@@ -1,6 +1,7 @@
 #include <cppQueue.h>
 #include "common.h"
 #include "colors.h"
+#include "config.h"
 
 // Used to indicate I2C scan finish from core1->core0
 #define I2C_SCAN_FINISHED 0xFF
@@ -13,16 +14,20 @@
 #define SHOULD_ENQUEUE_SEGMENT(x) (true)
 #endif
 
+
 #define PRINT_COLOR(c, x) \
-    if (printColors) \
+    if (cfg.isSerialPrintColors()) \
         Serial.print(c); \
     x; \
-    if (printColors) \
+    if (cfg.isSerialPrintColors()) \
         Serial.print(COLOR_RESET);
 
 
-bool showTimestamp = true;
-bool printColors = true;
+
+Config cfg;
+// bool showTimestamp = true;
+// bool printColors = true;
+
 
 // Message from core0->core1
 uint32_t msg_core0 = 0;
@@ -130,12 +135,16 @@ void printHelp() {
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
     Serial.println("  scan    - Scan for I2C devices");
-    
     // Modifiers for POST monitor
+    Serial.println("\r\nPOST modifiers:");
     Serial.println("  ts      - Toggle showing timestamps");
     Serial.println("  colors  - Print colors over serial");
     Serial.println("  rotate  - Rotate display");
-    
+    Serial.println("  mirror  - Mirror display");
+    Serial.println("\r\nConfig:");
+    Serial.println("  config  - Show config");
+    Serial.println("  save    - Save config");
+    Serial.println("\r\nGeneral:");
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
 }
@@ -165,10 +174,16 @@ void handleRepl() {
                     currentState = STATE_I2C_SCAN;
                 } else if (inputBuffer == "rotate") {
                     currentState = STATE_DISPLAY_ROTATE;
+                } else if (inputBuffer == "mirror") {
+                    currentState = STATE_DISPLAY_MIRROR;
                 } else if (inputBuffer == "colors") {
                     currentState = STATE_TOGGLE_COLORS;
                 } else if (inputBuffer == "ts") {
                     currentState = STATE_TOGGLE_TIMESTAMP;
+                } else if (inputBuffer == "config") {
+                    currentState = STATE_CONFIG_SHOW;
+                } else if (inputBuffer == "save") {
+                    currentState = STATE_CONFIG_SAVE;
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -214,7 +229,7 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
         Serial.print("] ");
     }
 
-    if (showTimestamp) {
+    if (cfg.isPostPrintTimestamps()) {
         Serial.print("(");
         PRINT_COLOR(COLOR_TIMESTAMP, Serial.print(timestamp / 1000.0))
         Serial.print(" ms");
@@ -355,10 +370,20 @@ void setup() {
         delay(10);
     }
 #endif
-
     Serial.begin(SERIAL_BAUD);
+    if (!cfg.begin()) {
+        Serial.println("Failed to load config");
+    }
+
     if (display.setup()) {
         Serial.println("SSD1306 Display detected :)");
+        // Set display rotation
+        display.setRotation(
+            cfg.isRotationPortrait()
+            ? DISPLAY_PORTRAIT
+            : DISPLAY_LANDSCAPE
+        );
+        display.setMirroring(cfg.isDisplayMirrored());
     } else {
         Serial.println("No display detected :(");
     }
@@ -412,17 +437,39 @@ void loop() {
             break;
         case STATE_DISPLAY_ROTATE:
             display.toggleRotation();
+            cfg.toggleRotationPortrait();
             print("Notice", "Display rotated");
             currentState = STATE_RETURN_TO_REPL;
             break;
+        case STATE_DISPLAY_MIRROR:
+            display.toggleMirroring();
+            cfg.toggleDisplayMirrored();
+            print("Notice", "Display mirrored");
+            currentState = STATE_RETURN_TO_REPL;
+            break;
         case STATE_TOGGLE_TIMESTAMP:
-            showTimestamp = !showTimestamp;
+            cfg.togglePostPrintTimestamps();
             print("Notice", "Toggled timestamps");
             currentState = STATE_RETURN_TO_REPL;
+            break;
         case STATE_TOGGLE_COLORS:
-            printColors = !printColors;
+            cfg.toggleSerialPrintColors();
             print("Notice", "Toggled printing colors");
             currentState = STATE_RETURN_TO_REPL;
+            break;
+        case STATE_CONFIG_SHOW:
+            print("Notice", "Showing config");
+            Serial.printf("Display mirrored:       %s\r\n", cfg.isDisplayMirrored() ? "ON" : "OFF");
+            Serial.printf("Disp rotation portrait: %s\r\n", cfg.isRotationPortrait() ? "YES" : "NO");
+            Serial.printf("Print timestamps:       %s\r\n", cfg.isPostPrintTimestamps() ? "ON" : "OFF");
+            Serial.printf("Print colors:           %s\r\n", cfg.isSerialPrintColors() ? "ON" : "OFF");
+            currentState = STATE_RETURN_TO_REPL;
+            break;
+        case STATE_CONFIG_SAVE:
+            cfg.save();
+            print("Notice", "Saved config");
+            currentState = STATE_RETURN_TO_REPL;
+            break;
     }
 
     // Check for CTRL+C

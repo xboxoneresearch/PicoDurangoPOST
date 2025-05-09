@@ -21,7 +21,7 @@ bool Display::setup() {
 
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
-    display.setRotation(currentRotation);
+    setRotation(currentRotation);
 
     initialized = true;
     return true;
@@ -33,7 +33,7 @@ void Display::printMessage(const char* header, const char *text, int durationMs)
     }
 
     clear();
-    display.setRotation(DISP_ROTATION_LANDSCAPE);
+    setRotation(DISPLAY_LANDSCAPE);
 
     display.setTextSize(1);
     printCenteredH((char *)header);
@@ -47,7 +47,7 @@ void Display::printMessage(const char* header, const char *text, int durationMs)
         display.clearDisplay();
     }
 
-    display.setRotation(currentRotation);
+    setRotation(currentRotation);
 }
 
 void Display::printCentered(const char *text, int16_t x, int16_t y) {
@@ -90,24 +90,6 @@ void Display::printCenteredH(char *text, int16_t x, int16_t y) {
         y / 2
     );
     display.println(text);
-}
-
-void Display::updateDisplayRotation(DisplayRotation rotation) {
-    if (!initialized) {
-        return;
-    }
-
-    display.setRotation(DISP_ROTATION_LANDSCAPE);
-    display.clearDisplay();
-    display.setTextSize(1);
-    printCentered("Updated rotation");
-    display.display();
-
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.setRotation(rotation);
-
-    currentRotation = rotation;
 }
 
 void Display::printCode(uint16_t code, const char *flavor, const char *name, uint8_t segmentNibble) {

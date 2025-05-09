@@ -32,7 +32,10 @@ enum State {
     STATE_I2C_SCAN,
     STATE_TOGGLE_TIMESTAMP,
     STATE_TOGGLE_COLORS,
-    STATE_DISPLAY_ROTATE
+    STATE_DISPLAY_MIRROR,
+    STATE_DISPLAY_ROTATE,
+    STATE_CONFIG_SHOW,
+    STATE_CONFIG_SAVE,
 };
 
 typedef struct {
@@ -81,15 +84,16 @@ static I2cDevice KnownDevices[] = {
     {0x39, "MAX6958/9B"},
     
     {0x5A, "RF Unit (ISD9160)"},
-    {NULL, NULL}
 };
+
+const uint16_t KNOWN_DEVICES_COUNT = sizeof(KnownDevices) / sizeof(I2cDevice);
 
 // Indicated by Segments-register
 enum CodeFlavor: uint8_t {
     CODE_FLAVOR_CPU = 0x10,
     CODE_FLAVOR_SP =  0x30,
     CODE_FLAVOR_SMC = 0x70,
-    CODE_FLAVOR_OS =  0xF0
+    CODE_FLAVOR_OS =  0xF0,
 };
 
 static PostCode PostCodes[] = {
@@ -142,9 +146,10 @@ static PostCode PostCodes[] = {
     {0xE422, "SMC_THERMAL_UNKNOWN"},
     {0xE423, "SMC_THERMAL_UNKNOWN"},
     {0xE424, "SMC_THERMAL_UNKNOWN"},
-    {0xEC0E, "SMC_RUNTIME_TIMEOUT"},    
-    {NULL, NULL}
+    {0xEC0E, "SMC_RUNTIME_TIMEOUT"},
 };
+
+const uint16_t POST_CODES_COUNT = sizeof(PostCodes) / sizeof(PostCode);
 
 /*
 SMCFW is the first SMC component to send POST codes
@@ -206,9 +211,9 @@ static Stage2BL Stages2BL[] = {
     {POST_2BL_STAGE_BlLoadVbi_6, "2BL_STAGE_BlLoadVbi_6"},
     {POST_2BL_STAGE_BlLoadVbi_7, "2BL_STAGE_BlLoadVbi_7"},
     {POST_2BL_FINAL, "2BL_FINAL"}, // BlMain
-    {NULL, NULL}
 };
 
+const uint16_t STAGES_2BL_COUNT = sizeof(Stages2BL) / sizeof(Stage2BL);
 
 /*
 AMD AGESA PostCodes / testpoints
@@ -437,8 +442,9 @@ static PostCode AblPostCodes[] = {
     {0xf8, "TpPerfUnit"},                                ///< F8 .. The Unit of performance measure.
     //{0xff, "EndAgesaTps"},                             ///< Last defined AGESA TP
     {0xff, "SUCCESS"},
-    {NULL, NULL}
 };
+
+const uint16_t ABL_POST_CODES_COUNT = sizeof(AblPostCodes) / sizeof(PostCode);
 
 enum MAX6958Registers {
     NoOp = 0x00,
@@ -455,7 +461,7 @@ enum MAX6958Registers {
     Digit1 = 0x21,
     Digit2 = 0x22,
     Digit3 = 0x23,
-    Segments = 0x24
+    Segments = 0x24,
 };
 
 static const char* getCodeFlavorForSegment(uint8_t segment) {
@@ -474,49 +480,49 @@ static const char* getCodeFlavorForSegment(uint8_t segment) {
 }
 
 static const char* getDeviceNameForI2cAddress(uint8_t addr) {
-    PI2cDevice pKnownDevices = KnownDevices;
-    while (pKnownDevices->name != NULL) {
-        if (pKnownDevices->address == addr) {
-            return pKnownDevices->name;
+    int pos = 0;
+    while (pos < KNOWN_DEVICES_COUNT) {
+        if (KnownDevices[pos].address == addr) {
+            return KnownDevices[pos].name;
         }
-        pKnownDevices++;
+        pos++;
     }
 
     return "<UNKNOWN>";
 }
 
 static const char *getNameFor2BlPhase(uint8_t code) {
-    PStage2BL pStage2BL = Stages2BL;
-    while (pStage2BL->name != NULL) {
-        if (pStage2BL->stage == code) {
-            return pStage2BL->name;
+    int pos = 0;
+    while (pos < STAGES_2BL_COUNT) {
+        if (Stages2BL[pos].stage == code) {
+            return Stages2BL[pos].name;
         }
-        pStage2BL++;
+        pos++;
     }
 
     return "2BL_UNKNOWN_PHASE";
 }
 
 static const char *getNameForAblTestpoint(uint8_t tpCode) {
-    PPostCode pAblPostCode = AblPostCodes;
-    while (pAblPostCode->name != NULL) {
+    int pos = 0;
+    while (pos < ABL_POST_CODES_COUNT) {
         // Only evaluate the lower 8 bits of Abl Code
-        if ((pAblPostCode->code & 0xFF) == tpCode) {
-            return pAblPostCode->name;
+        if ((AblPostCodes[pos].code & 0xFF) == tpCode) {
+            return AblPostCodes[pos].name;
         }
-        pAblPostCode++;
+        pos++;
     }
 
     return "TP_UNKNOWN";
 }
 
 static char *getNameForPostcode(uint16_t code) {
-    PPostCode pPostCodes = PostCodes;
-    while (pPostCodes->name != NULL) {
-        if (pPostCodes->code == code) {
-            return (char *)pPostCodes->name;
+    int pos = 0;
+    while (pos < POST_CODES_COUNT) {
+        if (PostCodes[pos].code == code) {
+            return (char *)PostCodes[pos].name;
         }
-        pPostCodes++;
+        pos++;
     }
 
     return NULL;
