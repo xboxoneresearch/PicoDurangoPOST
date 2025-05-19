@@ -61,6 +61,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          generate_notes: false
+          generate_release_notes: false
           files: |
             pico-durango-post-*.zip

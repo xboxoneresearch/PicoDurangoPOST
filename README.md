@@ -1,3 +1,7 @@
+[![PlatformIO CI](https://github.com/xboxoneresearch/PicoDurangoPOST/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xboxoneresearch/PicoDurangoPOST/actions/workflows/build.yml)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/xboxoneresearch/PicoDurangoPOST/latest/total)
+[![GitHub latest Tag](https://img.shields.io/github/v/tag/xboxoneresearch/PicoDurangoPOST)](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
+
 # Durango POST-Code reader via RasPi Pico
 
 This software for the Raspberry Pi Pico serves two purposes.
@@ -34,6 +38,7 @@ Pi Pico -> FACET
 
 ## Usage
 
+- Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
 - Flash/Copy *.uf2 onto Pi Pico
 - Listen on the exposed USB Serial interface (via PuTTy or similar UART monitor software)
 
