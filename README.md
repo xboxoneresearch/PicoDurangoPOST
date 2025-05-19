@@ -36,13 +36,15 @@ Pi Pico -> FACET
 - SCL: Pi Pico Pin 10 (GP7) -> Display Pin SCL
 - GND -> GND
 
+![OLED Display with POST code](./assets/display.jpg)
+
 ## Usage
 
 - Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
 - Flash/Copy *.uf2 onto Pi Pico
 - Listen on the exposed USB Serial interface (via PuTTy or similar UART monitor software)
 
-![Example output](./assets/screenshot.png)
+![Example output](./assets/screenshot2.png)
 
 ## Develop
 
