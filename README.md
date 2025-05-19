@@ -4,16 +4,19 @@
 
 # Durango POST-Code reader via RasPi Pico
 
-This software for the Raspberry Pi Pico serves two purposes.
+This software flashed to the Raspberry Pi Pico allows for monitoring of POST codes, which is useful for fault diagnosis on the hardware.
 
-- On Startup, it does a I2C bus scan, to enumerate available devices (f.e. Voltage control ICs)
-- After that, it goes into I2C Slave Mode and poses as MAX6958A (7-Segment-Display-IC). This allows to listen for POST codes.
+Jump to [Usage](#usage)
 
 Technical infos:
 
-- [POST bus on Xbox One](https://xboxoneresearch.github.io/wiki/hardware/post/)
+- [POST bus on Xbox One - Wiki page](https://xboxoneresearch.github.io/wiki/hardware/post/)
 
-Interpretation of the values? That's not figured out yet lol
+The wiki page contains a list of POST codes that are already known. 
+
+Also check out the video from @craftbenmine
+
+[![Watch the video](https://img.youtube.com/vi/BuPhxKdxU0g/hqdefault.jpg)](https://www.youtube.com/embed/BuPhxKdxU0g)
 
 ## Connections
 
@@ -43,6 +46,13 @@ Pi Pico -> FACET
 - Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
 - Flash/Copy *.uf2 onto Pi Pico
 - Listen on the exposed USB Serial interface (via PuTTy or similar UART monitor software)
+
+How to interact ?
+
+- On Startup, it directly goes into POST monitoring mode.
+- If you hit "CTRL+C" you will be brought into the REPL-menu.
+- Here you can set various options or scan for I2C devices on the bus.
+- Check out the "help" command.
 
 ![Example output](./assets/screenshot2.png)
 
