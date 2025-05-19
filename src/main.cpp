@@ -372,7 +372,12 @@ void setup() {
     } else {
         Serial.println("No display detected :(");
     }
-    print("Firmware", __FW_VERSION__, 1000);
+
+    char *fwString = (char *)calloc(1, 255);
+    snprintf(fwString, 255, "v%s %lu", __FW_VERSION__, __BUILD_DATE__);
+    print("Firmware", fwString, 1000);
+    free(fwString);
+    print("Presented by", "xboxresearch.com");
     
     Serial.println("POST Reader I2C");
 }
