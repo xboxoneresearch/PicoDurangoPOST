@@ -1,6 +1,6 @@
-#include <cppQueue.h>
 #include "common.h"
 #include "colors.h"
+#include "codes.h"
 #include "config.h"
 
 // Used to indicate I2C scan finish from core1->core0
@@ -23,32 +23,17 @@
         Serial.print(COLOR_RESET);
 
 
-
-Config cfg;
-// bool showTimestamp = true;
-// bool printColors = true;
-
-
 // Message from core0->core1
 uint32_t msg_core0 = 0;
-uint64_t timestamp = time_us_64();
 
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
-State currentState = STATE_POST_MONITOR;
+
 String inputBuffer = "";
-uint8_t registers[MAX6958_REGISTER_SIZE];
-char *codeName = (char*)calloc(1, 255);
+char *codeName = (char*)calloc(1, 255);;
 
-// Create a queue for POST codes
-cppQueue	postCodeQueue(sizeof(SegmentData), POST_MAX_QUEUE_SIZE, FIFO);
-Display     display(DISP_SCREEN_WIDTH, DISP_SCREEN_HEIGHT, PIN_SDA_DISP, PIN_SCL_DISP, SSD1306_DISP_ADDRESS, &Wire1);
-
-enum CrossThreadMsg: uint32_t {
-    INVALID = 0,
-    SCAN_I2C = 1,
-    RESET_TIMESTAMP = 2
-};
+Config cfg;
+RuntimeState runtimeState;
 
 char *postCodeToName(uint16_t code) {
     uint8_t loByte = code & 0xFF;
@@ -151,7 +136,7 @@ void printHelp() {
 
 void print(const char* header, const char *text, int durationMs = 0) {
     Serial.printf("%s: %s\r\n", header, text);
-    display.printMessage(header, text, durationMs);
+    runtimeState.display()->printMessage(header, text, durationMs);
 }
 
 void handleRepl() {
@@ -159,7 +144,7 @@ void handleRepl() {
         char c = Serial.read();
         
         // Echo character in REPL mode
-        if (currentState == STATE_REPL && isalpha(c)) {
+        if (runtimeState.getCurrentState() == STATE_REPL && isalpha(c)) {
             Serial.write(c);
         }
         
@@ -169,21 +154,21 @@ void handleRepl() {
             if (inputBuffer.length() > 0) {
                 inputBuffer.trim();
                 if (inputBuffer == "post") {
-                    currentState = STATE_POST_MONITOR;
+                    runtimeState.setCurrentState(STATE_POST_MONITOR);
                 } else if (inputBuffer == "scan") {
-                    currentState = STATE_I2C_SCAN;
+                    runtimeState.setCurrentState(STATE_I2C_SCAN);
                 } else if (inputBuffer == "rotate") {
-                    currentState = STATE_DISPLAY_ROTATE;
+                    runtimeState.setCurrentState(STATE_DISPLAY_ROTATE);
                 } else if (inputBuffer == "mirror") {
-                    currentState = STATE_DISPLAY_MIRROR;
+                    runtimeState.setCurrentState(STATE_DISPLAY_MIRROR);
                 } else if (inputBuffer == "colors") {
-                    currentState = STATE_TOGGLE_COLORS;
+                    runtimeState.setCurrentState(STATE_TOGGLE_COLORS);
                 } else if (inputBuffer == "ts") {
-                    currentState = STATE_TOGGLE_TIMESTAMP;
+                    runtimeState.setCurrentState(STATE_TOGGLE_TIMESTAMP);
                 } else if (inputBuffer == "config") {
-                    currentState = STATE_CONFIG_SHOW;
+                    runtimeState.setCurrentState(STATE_CONFIG_SHOW);
                 } else if (inputBuffer == "save") {
-                    currentState = STATE_CONFIG_SAVE;
+                    runtimeState.setCurrentState(STATE_CONFIG_SAVE);
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -191,7 +176,7 @@ void handleRepl() {
                 }
                 inputBuffer = "";
             }
-            if (currentState == STATE_REPL) {
+            if (runtimeState.getCurrentState() == STATE_REPL) {
                 Serial.print(">> ");  // REPL prompt after command
             }
         } else if (isalpha(c)) {
@@ -203,7 +188,7 @@ void handleRepl() {
 void printRegisters() {
     Serial.println(">> REGISTERS");
     for (int i = 0; i < MAX6958_REGISTER_SIZE; i++) {
-        int val = registers[i];
+        int val = runtimeState.getRegister(i);
         Serial.printf("REG 0x%02X : 0x%02X\r\n", i, val);
     }
 }
@@ -214,7 +199,7 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
 
-    display.printCode(code, flavor, name, segmentNibble);
+    runtimeState.display()->printCode(code, flavor, name, segmentNibble);
     
     // Color is only printed if `printColors` is set
     PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
@@ -251,22 +236,22 @@ void core1_receiveI2cData(int howMany) {
             // If Register is > MAX6958_REGISTER_SIZE, also expect a new packet following
             reg = Wire.read();
         } else {
-            registers[reg] = Wire.read();
+            runtimeState.setRegister(reg, Wire.read());
             // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
                 // Get uS relative to last timer reset
-                segData.timestamp = time_us_64() - timestamp;
-                segData.segments  = registers[Segments];
-                segData.digits[0] = registers[Digit0];
-                segData.digits[1] = registers[Digit1];
-                segData.digits[2] = registers[Digit2];
-                segData.digits[3] = registers[Digit3];
+                segData.timestamp = time_us_64() - runtimeState.getTimestamp();
+                segData.segments  = runtimeState.getRegister(Segments);
+                segData.digits[0] = runtimeState.getRegister(Digit0);
+                segData.digits[1] = runtimeState.getRegister(Digit1);
+                segData.digits[2] = runtimeState.getRegister(Digit2);
+                segData.digits[3] = runtimeState.getRegister(Digit3);
                 
                 // Add code to queue if it's not full
-                if (SHOULD_ENQUEUE_SEGMENT(segData.segments) && !postCodeQueue.isFull()) {
-                    postCodeQueue.push((SegmentData *)&segData);
+                if (SHOULD_ENQUEUE_SEGMENT(segData.segments) && !runtimeState.isPostCodeQueueFull()) {
+                    runtimeState.pushPostCode((SegmentData *)&segData);
                 }
             }
             // After each byte the target register address is automatically incremented
@@ -322,8 +307,8 @@ void loop1() {
                 Wire.onReceive(core1_receiveI2cData);
                 break;
             case RESET_TIMESTAMP:
-                timestamp = time_us_64();
-                postCodeQueue.clean();
+                runtimeState.resetTimestamp();
+                runtimeState.clearPostCodeQueue();
                 break;
         }
     }
@@ -375,15 +360,15 @@ void setup() {
         Serial.println("Failed to load config");
     }
 
-    if (display.setup()) {
+    if (runtimeState.begin()) {
         Serial.println("SSD1306 Display detected :)");
         // Set display rotation
-        display.setRotation(
+        runtimeState.display()->setRotation(
             cfg.isRotationPortrait()
             ? DISPLAY_PORTRAIT
             : DISPLAY_LANDSCAPE
         );
-        display.setMirroring(cfg.isDisplayMirrored());
+        runtimeState.display()->setMirroring(cfg.isDisplayMirrored());
     } else {
         Serial.println("No display detected :(");
     }
@@ -393,13 +378,13 @@ void setup() {
 }
 
 void loop() {
-    switch (currentState) {
+    switch (runtimeState.getCurrentState()) {
         case STATE_RETURN_TO_REPL:
             if (postMonitorRunning) {
                 postMonitorRunning = false;
             }
 
-            currentState = STATE_REPL;
+            runtimeState.setCurrentState(STATE_REPL);
             Serial.println("Returning to REPL...");
             printHelp();
             Serial.print(">> ");  // REPL prompt after returning
@@ -413,17 +398,17 @@ void loop() {
             if (!postMonitorRunning) {
                 postMonitorRunning = true;
                 sendMessageToCore1(RESET_TIMESTAMP);
-                display.clear();
+                runtimeState.display()->clear();
                 Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
             }
 
-            if (Serial.peek() == 'r') {
+            if (Serial.available() && Serial.peek() == 'r') {
                 sendMessageToCore1(RESET_TIMESTAMP);
             }
 
             // Process all codes in the queue
-            while (!postCodeQueue.isEmpty()) {
-                if(postCodeQueue.pop((SegmentData*)&currentSegData)) {
+            while (!runtimeState.isPostCodeQueueEmpty()) {
+                if(runtimeState.popPostCode(&currentSegData)) {
                     uint16_t code = segmentDigitsToCode(&currentSegData);
                     printCode(code, currentSegData.segments, currentSegData.timestamp);
                 }
@@ -433,29 +418,29 @@ void loop() {
         case STATE_I2C_SCAN:
             scanForAvailableDevices();
             // After scan, jump right back into REPL
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_DISPLAY_ROTATE:
-            display.toggleRotation();
+            runtimeState.display()->toggleRotation();
             cfg.toggleRotationPortrait();
             print("Notice", "Display rotated");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_DISPLAY_MIRROR:
-            display.toggleMirroring();
+            runtimeState.display()->toggleMirroring();
             cfg.toggleDisplayMirrored();
             print("Notice", "Display mirrored");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_TOGGLE_TIMESTAMP:
             cfg.togglePostPrintTimestamps();
             print("Notice", "Toggled timestamps");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_TOGGLE_COLORS:
             cfg.toggleSerialPrintColors();
             print("Notice", "Toggled printing colors");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_CONFIG_SHOW:
             print("Notice", "Showing config");
@@ -463,22 +448,22 @@ void loop() {
             Serial.printf("Disp rotation portrait: %s\r\n", cfg.isRotationPortrait() ? "YES" : "NO");
             Serial.printf("Print timestamps:       %s\r\n", cfg.isPostPrintTimestamps() ? "ON" : "OFF");
             Serial.printf("Print colors:           %s\r\n", cfg.isSerialPrintColors() ? "ON" : "OFF");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_CONFIG_SAVE:
             cfg.save();
             print("Notice", "Saved config");
-            currentState = STATE_RETURN_TO_REPL;
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
     }
 
     // Check for CTRL+C
-    if (currentState != STATE_RETURN_TO_REPL
-        && currentState != STATE_REPL
+    if (runtimeState.getCurrentState() != STATE_RETURN_TO_REPL
+        && runtimeState.getCurrentState() != STATE_REPL
         && Serial.available()
         && Serial.read() == CTRL_C
     ) {
-        currentState = STATE_RETURN_TO_REPL;
+        runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
     }
 }
 

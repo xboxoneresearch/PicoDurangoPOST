@@ -1,9 +1,9 @@
 
 #include "common.h"
 
-bool Display::setup() {
-    twoWirePort->setSDA(sda);
-    twoWirePort->setSCL(scl);
+bool Display::begin(uint8_t sdaPin, uint8_t sclPin) {
+    twoWirePort->setSDA(sdaPin);
+    twoWirePort->setSCL(sclPin);
  
     twoWirePort->begin();
     twoWirePort->beginTransmission(address);

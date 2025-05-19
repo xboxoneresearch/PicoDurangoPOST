@@ -27,10 +27,8 @@ static inline INTERNAL_DisplayRotation getInternalRotation(DisplayRotation rotat
 
 class Display {
 public:
-    Display(uint8_t displayWidth, uint8_t displayHeight, uint8_t sdaPin, uint8_t sclPin, uint8_t i2cAddress, TwoWire *wire) {
+    Display(uint8_t displayWidth, uint8_t displayHeight, uint8_t i2cAddress, TwoWire *wire) {
         twoWirePort = wire;
-        sda = sdaPin;
-        scl = sclPin;
         address = i2cAddress;
         width = displayWidth;
         height = displayHeight;
@@ -43,7 +41,7 @@ public:
             free(codeBuf);
         }
     }
-    bool setup();
+    bool begin(uint8_t sdaPin, uint8_t sclPin);
 
     DisplayRotation getCurrentRotation() {
         return currentRotation;
@@ -105,8 +103,6 @@ private:
     TwoWire *twoWirePort;
     uint8_t width;
     uint8_t height;
-    uint8_t sda;
-    uint8_t scl;
     uint8_t address;
     DisplayRotation currentRotation;
     Adafruit_SSD1306 display;
