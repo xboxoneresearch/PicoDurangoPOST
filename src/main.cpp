@@ -116,7 +116,26 @@ uint16_t segmentDigitsToCode(SegmentData *segData) {
     return code;
 }
 
+
+void print(const char* header, const char *text, int durationMs = 0) {
+    Serial.printf("%s: %s\r\n", header, text);
+    runtimeState.display()->printMessage(header, text, durationMs);
+}
+
+void printFwVersion(bool startup = false) {
+    char *fwString = (char *)calloc(1, 255);
+    snprintf(fwString, 255, "v%s %lu", __FW_VERSION__, __BUILD_DATE__);
+    print("FW", fwString, 1000);
+    free(fwString);
+    if (startup) {
+        runtimeState.display()->printMessage("Presented by", "xboxresearch.com");
+    }
+}
+
 void printHelp() {
+    Serial.println("PicoDurangoPOST - by XboxOneResearch\r\n");
+    Serial.println("Website: https://xboxresearch.com");
+    Serial.println("Source: https://github.com/XboxOneResearch/PicoDurangoPOST");
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
     Serial.println("  scan    - Scan for I2C devices");
@@ -130,13 +149,9 @@ void printHelp() {
     Serial.println("  config  - Show config");
     Serial.println("  save    - Save config");
     Serial.println("\r\nGeneral:");
+    Serial.println("  version - Show firmware version");
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
-}
-
-void print(const char* header, const char *text, int durationMs = 0) {
-    Serial.printf("%s: %s\r\n", header, text);
-    runtimeState.display()->printMessage(header, text, durationMs);
 }
 
 void handleRepl() {
@@ -169,6 +184,8 @@ void handleRepl() {
                     runtimeState.setCurrentState(STATE_CONFIG_SHOW);
                 } else if (inputBuffer == "save") {
                     runtimeState.setCurrentState(STATE_CONFIG_SAVE);
+                } else if (inputBuffer == "version" ) {
+                    printFwVersion();
                 } else if (inputBuffer == "help") {
                     printHelp();
                 } else {
@@ -373,12 +390,7 @@ void setup() {
         Serial.println("No display detected :(");
     }
 
-    char *fwString = (char *)calloc(1, 255);
-    snprintf(fwString, 255, "v%s %lu", __FW_VERSION__, __BUILD_DATE__);
-    print("Firmware", fwString, 1000);
-    free(fwString);
-    print("Presented by", "xboxresearch.com");
-    
+    printFwVersion(true);
     Serial.println("POST Reader I2C");
 }
 
