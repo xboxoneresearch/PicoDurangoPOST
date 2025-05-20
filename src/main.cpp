@@ -390,8 +390,6 @@ void loop() {
             }
 
             runtimeState.setCurrentState(STATE_REPL);
-            Serial.println("Returning to REPL...");
-            printHelp();
             Serial.print(">> ");  // REPL prompt after returning
             break;
 
@@ -405,10 +403,6 @@ void loop() {
                 sendMessageToCore1(RESET_TIMESTAMP);
                 runtimeState.display()->clear();
                 Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
-            }
-
-            if (Serial.available() && Serial.peek() == 'r') {
-                sendMessageToCore1(RESET_TIMESTAMP);
             }
 
             // Process all codes in the queue
@@ -450,7 +444,7 @@ void loop() {
         case STATE_CONFIG_SHOW:
             print("Notice", "Showing config");
             Serial.printf("Display mirrored:       %s\r\n", cfg.isDisplayMirrored() ? "ON" : "OFF");
-            Serial.printf("Disp rotation portrait: %s\r\n", cfg.isRotationPortrait() ? "YES" : "NO");
+            Serial.printf("Disp rotation portrait: %s\r\n", cfg.isRotationPortrait() ? "ON" : "OFF");
             Serial.printf("Print timestamps:       %s\r\n", cfg.isPostPrintTimestamps() ? "ON" : "OFF");
             Serial.printf("Print colors:           %s\r\n", cfg.isSerialPrintColors() ? "ON" : "OFF");
             runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
@@ -465,10 +459,19 @@ void loop() {
     // Check for CTRL+C
     if (runtimeState.getCurrentState() != STATE_RETURN_TO_REPL
         && runtimeState.getCurrentState() != STATE_REPL
-        && Serial.available()
-        && Serial.read() == CTRL_C
-    ) {
-        runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+        && Serial.available())
+    {
+        int ch = Serial.read();
+
+        switch (ch) {
+            case CTRL_C:
+                runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+                break;
+            case 'r':
+                sendMessageToCore1(RESET_TIMESTAMP);
+                Serial.println("Resetting timestamp");
+                break;
+        }
     }
 }
 
