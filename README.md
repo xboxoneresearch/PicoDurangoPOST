@@ -26,8 +26,8 @@ Also check out the video from @craftbenmine
 
 Pi Pico -> FACET
 
-- SDA: Pi Pico Pin 0 (GP0) -> FACET Pin 26
-- SCL: Pi Pico Pin 1 (GP1) -> FACET Pin 25
+- SDA: Pi Pico Pin 1 (GP0) -> FACET Pin 26
+- SCL: Pi Pico Pin 2 (GP1) -> FACET Pin 25
 - GND -> GND
 
 ![Pi Pico Facet I2C connection diagram](./assets/connection_diagram.png)
