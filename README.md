@@ -12,7 +12,7 @@ Technical infos:
 
 - [POST bus on Xbox One - Wiki page](https://xboxoneresearch.github.io/wiki/hardware/post/)
 
-- [List of error codes](https://xboxoneresearch.github.io/errorcodes/)
+- [List of error codes](https://errors.xboxresearch.com)
 
 Also check out the video from @craftbenmine
 
