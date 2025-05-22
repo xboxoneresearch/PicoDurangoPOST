@@ -27,20 +27,34 @@ and @ACE Console Repairs
 > [!IMPORTANT]
 > With version v0.1.3, pin assignments for I2C got changed to GP0/GP1, to be in-sync with the pins used by [DuRFUnitI2C](https://github.com/xboxoneresearch/DuRFUnitI2C).
 > Before that I2C was on GP4/GP5.
+>
+> also: LOOK AT THE PIN MARKINGS ON THE FACET HEADER before soldering!
+>
+> Pin 1 is marked with a white dot, pins 2, 25, 26 by numbers!
+>
+> FACET connector orientation DOES CHANGE between console revisions!
 
 Pi Pico -> FACET
 
-- SDA: Pi Pico Pin 1 (GP0) -> FACET Pin 26
-- SCL: Pi Pico Pin 2 (GP1) -> FACET Pin 25
+- SDA: Pi Pico **Pin 1** (GP0) -> FACET **Pin 26**
+- SCL: Pi Pico **Pin 2** (GP1) -> FACET **Pin 25**
 - GND -> GND
 
 ![Pi Pico Facet I2C connection diagram](./assets/connection_diagram.png)
 
+![Pi Pico Facet I2C diagram - all revs](./assets/all_revs_diagram_ACE.jpg)
+
+Thx to @ACE Console Repairs for the diagram
+
 ### Optional: 0.91" OLED Display (SSD1306)
 
+Used dimensions: 0.91" 128x32 pixels, monochrome
+
+![SSD 1306 module](./assets/ssd1306_module.jpg)
+
 - Pi Pico 3V3 -> Display VCC
-- SDA: Pi Pico Pin  9 (GP6) -> Display Pin SDA
-- SCL: Pi Pico Pin 10 (GP7) -> Display Pin SCL
+- SDA: Pi Pico **Pin  9** (GP6) -> Display **Pin SDA**
+- SCL: Pi Pico **Pin 10** (GP7) -> Display **Pin SCL**
 - GND -> GND
 
 ![OLED Display with POST code](./assets/display.jpg)
