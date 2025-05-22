@@ -22,17 +22,28 @@ and @ACE Console Repairs
 
 [![ACE Console Repairs Video](https://img.youtube.com/vi/qWvvBrVMNzk/hqdefault.jpg)](https://www.youtube.com/watch?v=qWvvBrVMNzk)
 
+## Supported consoles
+
+- ✅ Xbox One PHAT
+- ✅ Xbox One S
+- ✅ Xbox One X
+
+Additional infos in preparation, but generally also supported:
+
+- ⚠️ Xbox Series S
+- ⚠️ Xbox Series X
+
 ## Connections
 
-> [!IMPORTANT]
-> With version v0.1.3, pin assignments for I2C got changed to GP0/GP1, to be in-sync with the pins used by [DuRFUnitI2C](https://github.com/xboxoneresearch/DuRFUnitI2C).
-> Before that I2C was on GP4/GP5.
->
-> also: LOOK AT THE PIN MARKINGS ON THE FACET HEADER before soldering!
+> [!CAUTION]
+> LOOK AT THE PIN MARKINGS ON THE FACET HEADER before soldering!
 >
 > Pin 1 is marked with a white dot, pins 2, 25, 26 by numbers!
 >
 > FACET connector orientation DOES CHANGE between console revisions!
+
+> [!IMPORTANT]
+> Xbox Series S / X require additional components to be populated, to activate I2C over FACET. More infos on that will follow!
 
 Pi Pico -> FACET
 
