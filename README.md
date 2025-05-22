@@ -14,9 +14,13 @@ Technical infos:
 
 - [List of error codes](https://errors.xboxresearch.com)
 
-Also check out the video from @craftbenmine
+Also check out the videos from @craftbenmine
 
-[![Watch the video](https://img.youtube.com/vi/BuPhxKdxU0g/hqdefault.jpg)](https://www.youtube.com/embed/BuPhxKdxU0g)
+[![craftbenmine YouTube video](https://img.youtube.com/vi/BuPhxKdxU0g/hqdefault.jpg)](https://www.youtube.com/watch?v=BuPhxKdxU0g)
+
+and @ACE Console Repairs
+
+[![ACE Console Repairs Video](https://img.youtube.com/vi/qWvvBrVMNzk/hqdefault.jpg)](https://www.youtube.com/watch?v=qWvvBrVMNzk)
 
 ## Connections
 
