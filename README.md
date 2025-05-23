@@ -39,7 +39,7 @@ Via AARDVARK connector
 ## Usage
 
 - Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
-- Flash the firmware onto the Pi Pico
+- Flash the firmware onto the Pi Pico (Pi Pico: `durango_post_monitor.uf2`, Pi Pico **2**: `*_pico2.uf2`)
   - Disconnect Pi Pico from your PC
   - Hold the BOOTSEL button
   - Plug in Pi Pico to the PC again
