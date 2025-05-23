@@ -6,21 +6,16 @@
 
 This software flashed to the Raspberry Pi Pico allows for monitoring of POST codes, which is useful for fault diagnosis on the hardware.
 
-Jump to [Usage](#usage)
-
-Technical infos:
-
-- [POST bus on Xbox One - Wiki page](https://xboxoneresearch.github.io/wiki/hardware/post/)
-
-- [List of error codes](https://errors.xboxresearch.com)
-
-Also check out the videos from [@craftbenmine](https://github.com/craftbenmine)
-
-[![craftbenmine YouTube video](https://img.youtube.com/vi/BuPhxKdxU0g/hqdefault.jpg)](https://www.youtube.com/watch?v=BuPhxKdxU0g)
-
-and [@ACE Console Repairs](https://github.com/ACE-AU)
-
-[![ACE Console Repairs Video](https://img.youtube.com/vi/qWvvBrVMNzk/hqdefault.jpg)](https://www.youtube.com/watch?v=qWvvBrVMNzk)
+- [Durango POST-Code reader via RasPi Pico](#durango-post-code-reader-via-raspi-pico)
+  - [Supported consoles](#supported-consoles)
+  - [Technical infos:](#technical-infos)
+  - [Usage](#usage)
+    - [How to interact ?](#how-to-interact-)
+  - [Videos / Tutorials](#videos--tutorials)
+  - [Connection diagram](#connection-diagram)
+    - [Optional: 0.91" OLED Display (SSD1306)](#optional-091-oled-display-ssd1306)
+  - [Screenshots](#screenshots)
+  - [Develop](#develop)
 
 ## Supported consoles
 
@@ -35,7 +30,64 @@ Via AARDVARK connector
 - ✅ Xbox Series S
 - ✅ Xbox Series X
 
-## Connections
+## Technical infos:
+
+- [POST bus on Xbox One - Wiki page](https://xboxoneresearch.github.io/wiki/hardware/post/)
+
+- [List of error codes](https://errors.xboxresearch.com)
+
+## Usage
+
+- Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
+- Flash the firmware onto the Pi Pico
+  - Disconnect Pi Pico from your PC
+  - Hold the BOOTSEL button
+  - Plug in Pi Pico to the PC again
+  - Release the BOOTSEL button
+  - A removable storage device should appear in your file explorer
+  - Drag the extracted *.uf2 file onto the *Removable storage medium*
+  - The removable storage should automatically disappear
+  - You are ready to go!
+
+- Listen on the exposed USB Serial interface, Baudrate: **115200** (via PuTTy or similar UART monitor software)
+  - How to use PuTTY? Check this [Link](https://www.ssh.com/academy/ssh/putty/windows)
+  - Tip: Make use of **Saving a session configuration**, no need to re-type Serial-port and baudrate each time!
+
+### How to interact ?
+
+> [!NOTE]
+> When you have no console connected or incorrectly wired, the Serial terminal won't show any output.
+>
+> To verify that your Pico is working, hit **CTRL+C** to enter the menu, then type **help**, press **[ENTER]**
+> To resume POST monitoring, type **post** and hit **[ENTER]**.
+
+> [!IMPORTANT]
+> The console needs to be at least receiving standby power to start the Southbridge. If, due to
+> a hardware fault this is not possible, the underlying issues have to be eliminated first, to be able to use
+> this tool.
+
+Check [Screenshots](#screenshots) to see how the sofware output looks.
+
+Generally:
+
+- On Startup, it directly goes into POST monitoring mode.
+- If you hit "CTRL+C" you will be brought into the REPL-menu.
+- Here you can set various options or scan for I2C devices on the bus.
+- Check out the "help" command.
+
+Jump to the [Connection diagram](#connection-diagram)
+
+## Videos / Tutorials
+
+Check out the videos from [@craftbenmine](https://github.com/craftbenmine)
+
+[![craftbenmine YouTube video](https://img.youtube.com/vi/BuPhxKdxU0g/hqdefault.jpg)](https://www.youtube.com/watch?v=BuPhxKdxU0g)
+
+and [@ACE Console Repairs](https://github.com/ACE-AU)
+
+[![ACE Console Repairs Video](https://img.youtube.com/vi/qWvvBrVMNzk/hqdefault.jpg)](https://www.youtube.com/watch?v=qWvvBrVMNzk)
+
+## Connection diagram
 
 > [!CAUTION]
 > LOOK AT THE PIN MARKINGS ON THE FACET HEADER before soldering!
@@ -51,8 +103,8 @@ Via AARDVARK connector
 
 Pi Pico -> FACET / AARDVARK
 
-- SDA: Pi Pico **Pin 1** (GP0) -> FACET **Pin 26** (AARDVARK, SMBUS_DATA on Series S/X)
-- SCL: Pi Pico **Pin 2** (GP1) -> FACET **Pin 25** (AARDVARK, SMBUS_CLK on Series S/X)
+- SDA: Pi Pico **Pin 1** (GP0) -> FACET **Pin 26** (AARDVARK **Pin 3** on Series S/X)
+- SCL: Pi Pico **Pin 2** (GP1) -> FACET **Pin 25** (AARDVARK **Pin 1** on Series S/X)
 - GND -> GND
 
 ![Pi Pico Facet I2C diagram - all revs](./assets/all_revs_diagram_ACE.jpg)
@@ -61,9 +113,9 @@ Thx to [@ACE-AU](https://github.com/ACE-AU) for the new diagram
 
 ### Optional: 0.91" OLED Display (SSD1306)
 
-Used dimensions: 0.91" 128x32 pixels, monochrome
+Model: SSD1306 0.91" 128x32 pixels, monochrome
 
-![SSD 1306 module](./assets/ssd1306_module.jpg)
+[SSD 1306 module photo](./assets/ssd1306_module.jpg)
 
 - Pi Pico 3V3 -> Display VCC
 - SDA: Pi Pico **Pin  9** (GP6) -> Display **Pin SDA**
@@ -72,23 +124,16 @@ Used dimensions: 0.91" 128x32 pixels, monochrome
 
 ![OLED Display with POST code](./assets/display.jpg)
 
-## Usage
 
-- Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
-- Flash/Copy *.uf2 onto Pi Pico
-- Listen on the exposed USB Serial interface (via PuTTy or similar UART monitor software)
+## Screenshots
 
-How to interact ?
-
-- On Startup, it directly goes into POST monitoring mode.
-- If you hit "CTRL+C" you will be brought into the REPL-menu.
-- Here you can set various options or scan for I2C devices on the bus.
-- Check out the "help" command.
+This is showing the output of firmware v0.2.0.
 
 ![Example output](./assets/screenshot2.png)
 
 ## Develop
 
-- VS Code
-- Extension: PlatformIO
-- Upload and Monitor
+- Use **VS Code** as your IDE / Code Editor
+- Install the extension [**PlatformIO**](https://platformio.org/)
+- Edit the code
+- Change to the **PlatformIO**-tab in VS Code and choose **Upload and Monitor** to compile and upload the code
