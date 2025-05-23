@@ -24,14 +24,16 @@ and @ACE Console Repairs
 
 ## Supported consoles
 
+Via FACET connector
+
 - ✅ Xbox One PHAT
 - ✅ Xbox One S
 - ✅ Xbox One X
 
-Additional infos in preparation, but generally also supported:
+Via AARDVARK connector
 
-- ⚠️ Xbox Series S
-- ⚠️ Xbox Series X
+- ✅ Xbox Series S
+- ✅ Xbox Series X
 
 ## Connections
 
@@ -43,19 +45,19 @@ Additional infos in preparation, but generally also supported:
 > FACET connector orientation DOES CHANGE between console revisions!
 
 > [!IMPORTANT]
-> Xbox Series S / X require additional components to be populated, to activate I2C over FACET. More infos on that will follow!
+> Xbox Series S / X require additional components to be populated, to activate I2C over FACET. AARDVARK port works as-is.
 
-Pi Pico -> FACET
+Pi Pico -> FACET / AARDVARK
 
-- SDA: Pi Pico **Pin 1** (GP0) -> FACET **Pin 26**
-- SCL: Pi Pico **Pin 2** (GP1) -> FACET **Pin 25**
+- SDA: Pi Pico **Pin 1** (GP0) -> FACET **Pin 26** (AARDVARK, SMBUS_DATA on Series S/X)
+- SCL: Pi Pico **Pin 2** (GP1) -> FACET **Pin 25** (AARDVARK, SMBUS_CLK on Series S/X)
 - GND -> GND
 
 ![Pi Pico Facet I2C connection diagram](./assets/connection_diagram.png)
 
 ![Pi Pico Facet I2C diagram - all revs](./assets/all_revs_diagram_ACE.jpg)
 
-Thx to @ACE Console Repairs for the diagram
+Thx to [@ACE-AU](https://github.com/ACE-AU) for the diagram
 
 ### Optional: 0.91" OLED Display (SSD1306)
 
