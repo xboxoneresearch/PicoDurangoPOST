@@ -42,81 +42,30 @@ SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 
 String inputBuffer = "";
-char *codeName = (char*)calloc(1, 255);;
 
 Config cfg;
 RuntimeState runtimeState;
 
-char *postCodeToName(uint16_t code) {
-    uint8_t loByte = code & 0xFF;
-    uint8_t hiByte = (code & 0xFF00) >> 8;
-    snprintf(codeName, 255, "\0");
+bool postCodeToName(uint8_t segment, uint16_t code, char *outName, bool *isErrorCode) {
+    bool ret = false;
+    CodeFlavor flavor = (CodeFlavor)(segment & 0xF0);
 
-    if (code == 0x14FF || code == 0x0075) {
-        // Exit early with generic names
-        return (char *)"BOOT_SUCCESS";
-    }
-    
-    // Match on range 0x01xx - 0x14xx (2BL)
-    if (hiByte >= POST_2BL_STAGE_UNKNOWN && hiByte <= POST_2BL_FINAL) {
-        // Search name for 2BL stage / hi byte
-        const char *phase2BL = getNameFor2BlPhase(hiByte);
-        // Search AMD AGESA / ABL PostCode / testpoint - lo byte
-        const char *tp2BL = getNameForAblTestpoint(loByte);
-
-        snprintf(codeName, 255, "%s_%s\0", phase2BL, tp2BL);
-        return codeName;
-    }
-
-    // Match on distinct u16 codes
-    char *res = getNameForPostcode(code);
-    if (res) {
-        return res;
-    }
-
-    switch (hiByte) {
-        case POST_SMC_FATAL:
-            snprintf(
-                codeName, 255, "%s_%02x\0",
-                "SMC_FATAL_UNKNOWN",
-                loByte
-            );
+    switch (flavor) {
+        case CODE_FLAVOR_SMC:
+            ret = getNameForSmcCode(segment, code, outName, isErrorCode);
             break;
-        case POST_SMC_THERMAL:
-            snprintf(
-                codeName, 255, "%s_%02x\0",
-                "SMC_THERMAL_UNKNOWN",
-                loByte
-            );
+        case CODE_FLAVOR_SP:
+            ret = getNameForSpCode(segment, code, outName, isErrorCode);
             break;
-        case POST_SMC_BOOT:
-            snprintf(
-                codeName, 255, "%s_%02x\0",
-                "SMC_BOOT_UNKNOWN",
-                loByte
-            );
+        case CODE_FLAVOR_CPU:
+            ret = getNameForCpuCode(segment, code, outName, isErrorCode);
             break;
-        case POST_SMC_RUNTIME:
-            snprintf(
-                codeName, 255, "%s_%02x\0",
-                "SMC_RUNTIME_UNKNOWN",
-                loByte
-            );
-            break;
-        case POST_SP_UNKNOWN:
-            snprintf(
-                codeName, 255, "%s_%02x\0",
-                "SP_UNKNOWN",
-                loByte
-            );
+        case CODE_FLAVOR_OS:
+            ret = getNameForOsCode(segment, code, outName, isErrorCode);
             break;
     }
 
-    if (strlen(codeName) > 0) {
-        return codeName;
-    }
-
-    return NULL;
+    return ret;
 }
 
 uint16_t segmentDigitsToCode(SegmentData *segData) {
@@ -223,34 +172,48 @@ void printRegisters() {
 }
 
 void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
-    char *name = postCodeToName(code);
+    bool isErrorCode = false;
+    char *codeName = (char*)calloc(1, 255);
+
+    bool success = postCodeToName(segment, code, codeName, &isErrorCode);
     const char *flavor = getCodeFlavorForSegment(segment);
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
 
-    runtimeState.display()->printCode(code, flavor, name, segmentNibble);
+    runtimeState.display()->printCode(code, flavor, codeName, segmentNibble);
     
     // Color is only printed if `printColors` is set
     PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
     Serial.print(" (");
     PRINT_COLOR(COLOR_SEG_INDEX, Serial.print(segmentNibble));
     Serial.print("): ");
-    PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
 
-    if (name != NULL) {
+    if (isErrorCode) {
+        PRINT_COLOR(COLOR_ERROR, Serial.printf("0x%04x", code))
+    } else {
+        PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
+    }
+
+    if (success && strlen(codeName) > 0) {
         Serial.print(" [");
-        PRINT_COLOR(COLOR_NAME, Serial.print(name))
-        Serial.print("] ");
+        if (isErrorCode) {
+            PRINT_COLOR(COLOR_ERROR, Serial.print(codeName))
+        } else {
+            PRINT_COLOR(COLOR_NAME, Serial.print(codeName))
+        }
+        Serial.print("]");
     }
 
     if (cfg.isPostPrintTimestamps()) {
-        Serial.print("(");
-        PRINT_COLOR(COLOR_TIMESTAMP, Serial.print(timestamp / 1000.0))
+        Serial.print(" (");
+        PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("%.0f", timestamp / 1000.0))
         Serial.print(" ms");
         Serial.print(")");
     }
 
     Serial.println();
+
+    free(codeName);
 }
 
 /* CORE 1 START */
