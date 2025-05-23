@@ -2,15 +2,7 @@
 
 #include <Arduino.h>
 
-typedef struct {
-    uint16_t code;
-    const char *name;
-} PostCode, *PPostCode;
-
-typedef struct {
-    uint8_t stage;
-    const char *name;
-} Stage2BL, *PStage2BL;
+#define ARRAY_SZ(arr, member) sizeof(arr) / sizeof(member)
 
 // Indicated by Segments-register
 enum CodeFlavor: uint8_t {
@@ -20,121 +12,177 @@ enum CodeFlavor: uint8_t {
     CODE_FLAVOR_OS =  0xF0,
 };
 
-static PostCode PostCodes[] = {
-    {0xE001, "SMC_FATAL_V12"},
-    {0xE002, "SMC_FATAL_V5"},
-    {0xE003, "SMC_FATAL_V3P3_PWRGPA"},
-    {0xE004, "SMC_FATAL_SBPOWERUP2"},
-    {0xE005, "SMC_FATAL_CPUGFX_STARTUP_PWRGPB"},
-    {0xE006, "SMC_FATAL_WIFI_UNRESET"},
-    {0xE007, "SMC_FATAL_FAN_STARTUP"},
-    {0xE008, "SMC_FATAL_SBPOWERUP1"},
-    {0xE009, "SMC_FATAL_UNKNOWN"},
-    {0xE00A, "SMC_FATAL_FAN_RUN"},
-    {0xE010, "SMC_FATAL_POWER_STABILIZE_RETRY"},
-    {0xE011, "SMC_THERMAL_OVERTEMP_THRESHOLD"},
-    {0xE046, "SMC_FATAL_GFXCPU_I2C_UNREACHABLE"},
-    {0xE04B, "SMC_FATAL_MEMIOCD"},
-    {0xE081, "SMC_FATAL_V12_HW_FAILURE"},
-    {0xE082, "SMC_FATAL_V5_HW_FAILURE"},
-    {0xE083, "SMC_FATAL_V3P3_HW_FAILURE"},
-    {0xE084, "SMC_FATAL_CPUGFX_HW_FAILURE"},
-    {0xE085, "SMC_FATAL_WIFI_HW_FAILURE"},
-    {0xE086, "SMC_FATAL_WIFI_UNRESET"},
-    {0xEB40, "SMC_BOOT_SBUNRESETWAIT"},
-    {0xEB41, "SMC_BOOT_PSPBOOTACKWAIT_DONE"},
-    {0xEB42, "SMC_BOOT_PSPPORSPEWWAIT_DONE"},
-    {0xEB43, "SMC_BOOT_SOCUNRESETWAIT_DONE"},
-    {0xEB44, "SMC_BOOT_SOCFLASHACCWAIT"},
-    {0xEB45, "SMC_BOOT_SOCPOST_DONE"},
-    {0xEB46, "SMC_BOOT_UNKNOWN"},
-    {0xEB47, "SMC_BOOT_UNKNOWN"},
-    {0xEB48, "SMC_BOOT_SOCPOWEROK_DONE"},
-    {0xEB49, "SMC_BOOT_XSSActiveWait_FAIL"},
-    {0xEA01, "SMC_RESET_PSPACK_MISSING"},
-    {0xEA02, "SMC_RESET_FATAL_THERMAL_PENDING"},
-    {0xEA03, "SMC_RESET_TIMEOUT"},
-    {0xEA04, "SMC_RESET_PIMACK_FAIL"},
-    {0xEA05, "SMC_RESET_PIM_BOOT_INCOMPLETE"},
-    {0xEA06, "SMC_RESET_BITMASK_INVALID"},
-    {0xEAFF, "SMC_RESET_INVALID_STATE"},
-    {0xEC01, "SMC_RUNTIME_GET_SOCSyncFLOOD_STATE"},
-    {0xEC02, "SMC_RUNTIME_UNKNOWN"},
-    {0xEC03, "SMC_RUNTIME_UNKNOWN"},
-    {0xEC04, "SMC_RUNTIME_EXTPOST"},
-    {0xEC05, "SMC_RUNTIME_UNKNOWN"},
-    {0xEC06, "SMC_RUNTIME_UNKNOWN"},
-    {0xEC07, "SMC_RUNTIME_UNKNOWN"},
-    {0xEC09, "SMC_RUNTIME_GET_SBSystemSubmode"},
-    {0xEC0B, "SMC_RUNTIME_I2C_CLEARMSG"},
-    {0xE422, "SMC_THERMAL_UNKNOWN"},
-    {0xE423, "SMC_THERMAL_UNKNOWN"},
-    {0xE424, "SMC_THERMAL_UNKNOWN"},
-    {0xEC0E, "SMC_RUNTIME_TIMEOUT"},
-};
+static const char* getCodeFlavorForSegment(uint8_t segment) {
+    switch (segment & 0xF0) {
+        case CODE_FLAVOR_CPU:
+            return "CPU";
+        case CODE_FLAVOR_SP:
+            return "SP ";
+        case CODE_FLAVOR_SMC:
+            return "SMC";
+        case CODE_FLAVOR_OS:
+            return "OS ";
+        default:
+            return "??";
+    }
+}
 
-const uint16_t POST_CODES_COUNT = sizeof(PostCodes) / sizeof(PostCode);
+typedef struct {
+    uint16_t code;
+    const char *name;
+    bool isError;
+} PostCode, *PPostCode;
+
+bool getNameForCode(uint16_t code, PostCode *codeArray, int arraySize, char *outName, bool *isError) {
+    *isError = false;
+
+    int pos = 0;
+    while (pos < arraySize) {
+        if (codeArray[pos].code == code) {
+            strncpy(outName, codeArray[pos].name, strlen(codeArray[pos].name));
+            *isError = codeArray[pos].isError;
+            return true;
+        }
+        pos++;
+    }
+
+    return false;
+}
 
 /*
 SMCFW is the first SMC component to send POST codes
 0smcbl and 1smcbl only output codes to ITM
 - ITM: https://developer.arm.com/documentation/100166/0001/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description?lang=en
 */
-enum PostType : uint8_t {
-    // SP
-    POST_SP_UNKNOWN =                          0x00,
-    // 2BL
-    POST_2BL_STAGE_UNKNOWN =                   0x01,
-    POST_2BL_STAGE_BlStartSmm =                0x02,
-    POST_2BL_STAGE_BlCallAgesa_1 =             0x03,
-    POST_2BL_STAGE_AgesaInitEarly =            0x04,
-    POST_2BL_STAGE_BlCallAgesa_3 =             0x05,
-    POST_2BL_STAGE_AgesaHookBeforeC6Storage =  0x06,
-    POST_2BL_STAGE_BlCallAgesa_4 =             0x07,
-    POST_2BL_STAGE_BlCallAgesa_5 =             0x08,
-    POST_2BL_STAGE_BlCallAgesa_6 =             0x09,
-    POST_2BL_STAGE_BlCallAgesa_7 =             0x0A,
-    POST_2BL_STAGE_BlStartSouthBridgeDevices = 0x0B,
-    POST_2BL_STAGE_UNKNOWN_2 =                 0x0C,
-    POST_2BL_STAGE_BlLoadVbi_1 =               0x0D,
-    POST_2BL_STAGE_BlLoadVbi_2 =               0x0E,
-    POST_2BL_STAGE_BlLoadVbi_3 =               0x0F,
-    POST_2BL_STAGE_BlLoadVbi_4 =               0x10,
-    POST_2BL_STAGE_BlLoadVbi_5 =               0x11,
-    POST_2BL_STAGE_BlLoadVbi_6 =               0x12,
-    POST_2BL_STAGE_BlLoadVbi_7 =               0x13,
-    POST_2BL_FINAL =                           0x14, // BlMain
-    // SMCFW
-    POST_SMC_FATAL =                           0xE0,
-    POST_SMC_THERMAL =                         0xE4,
-    POST_SMC_BOOT =                            0xEB,
-    POST_SMC_RUNTIME =                         0xEC
+
+// ! Do not remove these comments !
+// START_POSTCODE_SYNC_INJECTION
+
+static PostCode SMCCodes[] = {
+	{0xe001, "FATAL_V12", 1},
+	{0xe002, "FATAL_V5", 1},
+	{0xe003, "FATAL_PWRGPA", 1},
+	{0xe004, "FATAL_SBPOWERUP2", 1},
+	{0xe005, "FATAL_PWRGPB", 1},
+	{0xe006, "FATAL_CPUGFX", 1},
+	{0xe007, "FATAL_FAN_STARTUP", 1},
+	{0xe008, "FATAL_SBPOWERUP1", 1},
+	{0xe009, "FATAL_09", 1},
+	{0xe00a, "FATAL_FAN_RUN", 1},
+	{0xe010, "FATAL_POWER_STABILIZE_RETRY", 1},
+	{0xe011, "THERMAL_OVERTEMP_THRESHOLD", 1},
+	{0xe042, "FATAL_V_5P0_I2C_UNREACHABLE", 1},
+	{0xe046, "FATAL_GFXCPU_I2C_UNREACHABLE", 1},
+	{0xe04a, "FATAL_MEMIOAB", 1},
+	{0xe04b, "FATAL_MEMIOCD", 1},
+	{0xe081, "FATAL_V12_HW_FAILURE", 1},
+	{0xe082, "FATAL_V5_HW_FAILURE", 1},
+	{0xe083, "FATAL_PWRGPA_HW_FAILURE", 1},
+	{0xe084, "FATAL_SBPOWERUP2_HW_FAILURE", 1},
+	{0xe085, "FATAL_PWRGPB_FAILURE", 1},
+	{0xe086, "FATAL_CPUGFX", 1},
+	{0xe089, "FATAL_NBCORE", 1},
+	{0xeb40, "BOOT_SBUNRESETWAIT", 1},
+	{0xeb41, "BOOT_PSPBOOTACKWAIT_DONE", 1},
+	{0xeb42, "BOOT_PSPPORSPEWWAIT_DONE", 1},
+	{0xeb43, "BOOT_SOCUNRESETWAIT_DONE", 1},
+	{0xeb44, "BOOT_SOCFLASHACCWAIT", 1},
+	{0xeb45, "BOOT_SOCPOST_DONE", 1},
+	{0xeb46, "BOOT_XSS_TIMEOUT_46", 1},
+	{0xeb47, "BOOT_XSS_TIMEOUT_47", 1},
+	{0xeb48, "BOOT_SOCPOWEROK_DONE", 1},
+	{0xeb49, "BOOT_COND_EARLY_ABORT", 1},
+	{0xea01, "RESET_PSPACK_MISSING", 1},
+	{0xea02, "RESET_FATAL_THERMAL_PENDING", 1},
+	{0xea03, "RESET_TIMEOUT", 1},
+	{0xea04, "RESET_PIMACK_FAIL", 1},
+	{0xea05, "RESET_PIM_BOOT_INCOMPLETE", 1},
+	{0xea06, "RESET_BITMASK_INVALID", 1},
+	{0xeaff, "RESET_INVALID_STATE", 1},
+	{0xec01, "RUNTIME_GET_SOCSyncFLOOD_STATE", 1},
+	{0xec02, "RUNTIME", 1},
+	{0xec03, "RUNTIME", 1},
+	{0xec04, "RUNTIME_EXTPOST", 1},
+	{0xec05, "RUNTIME_05", 1},
+	{0xec06, "RUNTIME_06", 1},
+	{0xec07, "RUNTIME_07", 1},
+	{0xec09, "RUNTIME_GET_SBSystemSubmode", 1},
+	{0xec0b, "RUNTIME_I2C_CLEARMSG", 1},
+	{0xec0e, "RUNTIME_TIMEOUT", 1},
+	{0xe421, "THERMAL_22", 1},
+	{0xe422, "THERMAL_22", 1},
+	{0xe423, "THERMAL_23", 1},
+	{0xe424, "THERMAL_24", 1}
+};
+
+static PostCode SPCodes[] = {
+	{0x0075, "BOOT_SUCCESS", 0}
+};
+
+static PostCode CPUCodes[] = {
+	{0x14ff, "BOOT_SUCCESS", 0}
+};
+
+static PostCode OSCodes[] = {
+
+};
+
+// END_POSTCODE_SYNC_INJECTION
+// ! Do not remove these comments !
+
+typedef struct {
+    uint8_t stage;
+    const char *name;
+    bool isError;
+} Stage2BL, *PStage2BL;
+
+enum _2BLStageEnum : uint8_t {
+    _2BL_UNKNOWN =                   0x01,
+    _2BL_BlStartSmm =                0x02,
+    _2BL_BlCallAgesa_1 =             0x03,
+    _2BL_AgesaInitEarly =            0x04,
+    _2BL_BlCallAgesa_3 =             0x05,
+    _2BL_AgesaHookBeforeC6Storage =  0x06,
+    _2BL_BlCallAgesa_4 =             0x07,
+    _2BL_BlCallAgesa_5 =             0x08,
+    _2BL_BlCallAgesa_6 =             0x09,
+    _2BL_BlCallAgesa_7 =             0x0A,
+    _2BL_BlStartSouthBridgeDevices = 0x0B,
+    _2BL_UNKNOWN_2 =                 0x0C,
+    _2BL_BlLoadVbi_1 =               0x0D,
+    _2BL_BlLoadVbi_2 =               0x0E,
+    _2BL_BlLoadVbi_3 =               0x0F,
+    _2BL_BlLoadVbi_4 =               0x10,
+    _2BL_BlLoadVbi_5 =               0x11,
+    _2BL_BlLoadVbi_6 =               0x12,
+    _2BL_BlLoadVbi_7 =               0x13,
+    _2BL_FINAL =                     0x14, // BlMain
 };
 
 /*
 BlWritePostCode(uint8_t) in 2BL
 */
 static Stage2BL Stages2BL[] = {
-    {POST_2BL_STAGE_UNKNOWN, "2BL_STAGE_UNKNOWN"},
-    {POST_2BL_STAGE_BlStartSmm, "2BL_STAGE_BlStartSmm"},
-    {POST_2BL_STAGE_BlCallAgesa_1, "2BL_STAGE_BlCallAgesa_1"},
-    {POST_2BL_STAGE_AgesaInitEarly, "2BL_STAGE_AgesaInitEarly"},
-    {POST_2BL_STAGE_BlCallAgesa_3, "2BL_STAGE_BlCallAgesa_3"},
-    {POST_2BL_STAGE_AgesaHookBeforeC6Storage, "2BL_STAGE_AgesaHookBeforeC6Storage"},
-    {POST_2BL_STAGE_BlCallAgesa_4, "2BL_STAGE_BlCallAgesa_4"},
-    {POST_2BL_STAGE_BlCallAgesa_5, "2BL_STAGE_BlCallAgesa_5"},
-    {POST_2BL_STAGE_BlCallAgesa_6, "2BL_STAGE_BlCallAgesa_6"},
-    {POST_2BL_STAGE_BlCallAgesa_7, "2BL_STAGE_BlCallAgesa_7"},
-    {POST_2BL_STAGE_BlStartSouthBridgeDevices, "2BL_STAGE_BlStartSouthBridgeDevices"},
-    {POST_2BL_STAGE_UNKNOWN_2, "2BL_STAGE_UNKNOWN_2"},
-    {POST_2BL_STAGE_BlLoadVbi_1, "2BL_STAGE_BlLoadVbi_1"},
-    {POST_2BL_STAGE_BlLoadVbi_2, "2BL_STAGE_BlLoadVbi_2"},
-    {POST_2BL_STAGE_BlLoadVbi_3, "2BL_STAGE_BlLoadVbi_3"},
-    {POST_2BL_STAGE_BlLoadVbi_4, "2BL_STAGE_BlLoadVbi_4"},
-    {POST_2BL_STAGE_BlLoadVbi_5, "2BL_STAGE_BlLoadVbi_5"},
-    {POST_2BL_STAGE_BlLoadVbi_6, "2BL_STAGE_BlLoadVbi_6"},
-    {POST_2BL_STAGE_BlLoadVbi_7, "2BL_STAGE_BlLoadVbi_7"},
-    {POST_2BL_FINAL, "2BL_FINAL"}, // BlMain
+    {_2BL_UNKNOWN, "2BL_UNKNOWN", 0},
+    {_2BL_BlStartSmm, "2BL_BlStartSmm", 0},
+    {_2BL_BlCallAgesa_1, "2BL_BlCallAgesa_1", 0},
+    {_2BL_AgesaInitEarly, "2BL_AgesaInitEarly", 0},
+    {_2BL_BlCallAgesa_3, "2BL_BlCallAgesa_3", 0},
+    {_2BL_AgesaHookBeforeC6Storage, "2BL_AgesaHookBeforeC6Storage", 0},
+    {_2BL_BlCallAgesa_4, "2BL_BlCallAgesa_4", 0},
+    {_2BL_BlCallAgesa_5, "2BL_BlCallAgesa_5", 0},
+    {_2BL_BlCallAgesa_6, "2BL_BlCallAgesa_6", 0},
+    {_2BL_BlCallAgesa_7, "2BL_BlCallAgesa_7", 0},
+    {_2BL_BlStartSouthBridgeDevices, "2BL_BlStartSouthBridgeDevices", 0},
+    {_2BL_UNKNOWN_2, "2BL_UNKNOWN_2", 0},
+    {_2BL_BlLoadVbi_1, "2BL_BlLoadVbi_1", 0},
+    {_2BL_BlLoadVbi_2, "2BL_BlLoadVbi_2", 0},
+    {_2BL_BlLoadVbi_3, "2BL_BlLoadVbi_3", 0},
+    {_2BL_BlLoadVbi_4, "2BL_BlLoadVbi_4", 0},
+    {_2BL_BlLoadVbi_5, "2BL_BlLoadVbi_5", 0},
+    {_2BL_BlLoadVbi_6, "2BL_BlLoadVbi_6", 0},
+    {_2BL_BlLoadVbi_7, "2BL_BlLoadVbi_7", 0},
+    {_2BL_FINAL, "2BL_FINAL", 0}, // BlMain
 };
 
 const uint16_t STAGES_2BL_COUNT = sizeof(Stages2BL) / sizeof(Stage2BL);
@@ -370,26 +418,14 @@ static PostCode AblPostCodes[] = {
 
 const uint16_t ABL_POST_CODES_COUNT = sizeof(AblPostCodes) / sizeof(PostCode);
 
-static const char* getCodeFlavorForSegment(uint8_t segment) {
-    switch (segment & 0xF0) {
-        case CODE_FLAVOR_CPU:
-            return "CPU";
-        case CODE_FLAVOR_SP:
-            return "SP ";
-        case CODE_FLAVOR_SMC:
-            return "SMC";
-        case CODE_FLAVOR_OS:
-            return "OS ";
-        default:
-            return "UNKNOWN";
-    }
-}
 
+static const char *getNameFor2BlPhase(uint8_t code, bool *isError) {
+    *isError = false;
 
-static const char *getNameFor2BlPhase(uint8_t code) {
     int pos = 0;
     while (pos < STAGES_2BL_COUNT) {
         if (Stages2BL[pos].stage == code) {
+            *isError = Stages2BL[pos].isError;
             return Stages2BL[pos].name;
         }
         pos++;
@@ -411,14 +447,44 @@ static const char *getNameForAblTestpoint(uint8_t tpCode) {
     return "TP_UNKNOWN";
 }
 
-static char *getNameForPostcode(uint16_t code) {
-    int pos = 0;
-    while (pos < POST_CODES_COUNT) {
-        if (PostCodes[pos].code == code) {
-            return (char *)PostCodes[pos].name;
-        }
-        pos++;
+static bool getNameForSmcCode(uint8_t segment, uint16_t code, char *outName, bool *isError) {
+    bool ret = getNameForCode(code, SMCCodes, ARRAY_SZ(SMCCodes, PostCode), outName, isError);
+    return ret;
+}
+
+static bool getNameForSpCode(uint8_t segment, uint16_t code, char *outName, bool *isError) {
+    bool ret = getNameForCode(code, SPCodes, ARRAY_SZ(SPCodes, PostCode), outName, isError);
+    return ret;
+}
+
+static bool getNameForCpuCode(uint8_t segment, uint16_t code, char *outName, bool *isError) {
+    uint8_t loByte = code & 0xFF;
+    uint8_t hiByte = (code & 0xFF00) >> 8;
+
+    // Match on range 0x01xx - 0x14xx (2BL)
+    if (hiByte >= _2BL_UNKNOWN && hiByte <= _2BL_FINAL) {
+        // Search name for 2BL stage / hi byte
+        const char *phase2BL = getNameFor2BlPhase(hiByte, isError);
+        // Search AMD AGESA / ABL PostCode / testpoint - lo byte
+        const char *tp2BL = getNameForAblTestpoint(loByte);
+
+        snprintf(outName, 255, "%s_%s\0", phase2BL, tp2BL);
+        return true;
     }
 
-    return NULL;
+    bool ret = getNameForCode(code, CPUCodes, ARRAY_SZ(CPUCodes, PostCode), outName, isError);
+    return ret;
+}
+
+static bool getNameForOsCode(uint8_t segment, uint16_t code, char *outName, bool *isError) {
+    *isError = false;
+    if (segment & 0xF == 1) {
+        // These are Uem / E-codes
+        *isError = true;
+        sprintf(outName, "E%03d", code);
+        return true;
+    }
+
+    bool ret = getNameForCode(code, OSCodes, ARRAY_SZ(OSCodes, PostCode), outName, isError);
+    return ret;
 }
