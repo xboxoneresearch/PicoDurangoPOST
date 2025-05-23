@@ -14,6 +14,18 @@
 #define SHOULD_ENQUEUE_SEGMENT(x) (true)
 #endif
 
+#ifndef __FW_VERSION__
+#define FW_VERSION "unknown version"
+#else
+#define FW_VERSION __FW_VERSION__
+#endif
+
+#ifndef __BUILD_DATE__
+#define BUILD_DATE 0
+#else
+#define BUILD_DATE __BUILD_DATE__
+#endif
+
 
 #define PRINT_COLOR(c, x) \
     if (cfg.isSerialPrintColors()) \
@@ -124,8 +136,8 @@ void print(const char* header, const char *text, int durationMs = 0) {
 
 void printFwVersion(bool startup = false) {
     char *fwString = (char *)calloc(1, 255);
-    snprintf(fwString, 255, "v%s %lu", __FW_VERSION__, __BUILD_DATE__);
-    print("FW", fwString, 1000);
+    snprintf(fwString, 255, "%s %lu", FW_VERSION, BUILD_DATE);
+    print("FW", fwString, 2000);
     free(fwString);
     if (startup) {
         runtimeState.display()->printMessage("Presented by", "xboxresearch.com");
