@@ -181,7 +181,7 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
 
-    runtimeState.display()->printCode(code, flavor, codeName, segmentNibble);
+    runtimeState.display()->printCode(code, flavor, success ? codeName: NULL, segmentNibble);
     
     // Color is only printed if `printColors` is set
     PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))

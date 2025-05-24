@@ -481,7 +481,7 @@ static bool getNameForOsCode(uint8_t segment, uint16_t code, char *outName, bool
     if (segment & 0xF == 1) {
         // These are Uem / E-codes
         *isError = true;
-        sprintf(outName, "E%03d", code);
+        snprintf(outName, 255, "E%03d\0", code);
         return true;
     }
 
