@@ -146,9 +146,9 @@ void handleRepl() {
                 } else if (inputBuffer == "save") {
                     runtimeState.setCurrentState(STATE_CONFIG_SAVE);
                 } else if (inputBuffer == "version" ) {
-                    printFwVersion();
+                    runtimeState.setCurrentState(STATE_PRINT_VERSION);
                 } else if (inputBuffer == "help") {
-                    printHelp();
+                    runtimeState.setCurrentState(STATE_PRINT_HELP);
                 } else {
                     Serial.println("Unknown command. Type 'help' for available commands.");
                 }
@@ -439,6 +439,14 @@ void loop() {
         case STATE_CONFIG_SAVE:
             cfg.save();
             print("Notice", "Saved config");
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+            break;
+        case STATE_PRINT_VERSION:
+            printFwVersion();
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+            break;
+        case STATE_PRINT_HELP:
+            printHelp();
             runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
     }
