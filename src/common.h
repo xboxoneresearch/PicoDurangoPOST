@@ -37,6 +37,8 @@ enum State {
     STATE_DISPLAY_ROTATE,
     STATE_CONFIG_SHOW,
     STATE_CONFIG_SAVE,
+    STATE_PRINT_VERSION,
+    STATE_PRINT_HELP,
 };
 
 // For communication between core0/1
