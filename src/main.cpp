@@ -86,7 +86,8 @@ void print(const char* header, const char *text, int durationMs = 0) {
 void printFwVersion(bool startup = false) {
     char *fwString = (char *)calloc(1, 255);
     snprintf(fwString, 255, "%s %lu", FW_VERSION, BUILD_DATE);
-    print("FW", fwString, 2000);
+    // Only delay the print on startup
+    print("FW", fwString, startup ? 2000 : 0);
     free(fwString);
     if (startup) {
         runtimeState.display()->printMessage("Presented by", "xboxresearch.com");
