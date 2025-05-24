@@ -85,7 +85,7 @@ Check out the videos from [@craftbenmine](https://github.com/craftbenmine)
 
 and [@ACE Console Repairs](https://github.com/ACE-AU)
 
-[![ACE Console Repairs Video](https://img.youtube.com/vi/qWvvBrVMNzk/hqdefault.jpg)](https://www.youtube.com/watch?v=qWvvBrVMNzk)
+[![ACE Console Repairs Video](https://img.youtube.com/vi/b2gaV6t57Mc/hqdefault.jpg)](https://www.youtube.com/watch?v=b2gaV6t57Mc)
 
 ## Connection diagram
 
