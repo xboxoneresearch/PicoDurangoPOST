@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Submit new error code(s)
+    url: https://errors.xboxresearch.com
+    about: Please use the submission form if you only have a few codes to contribute.
+  - name: Discuss or submit many error codes
+    url: https://github.com/xboxoneresearch/errorcodes/discussions
+    about: This discussion section is for discussing codes, help with diagnosis or submitting a list of new codes.
