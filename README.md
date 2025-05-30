@@ -38,6 +38,11 @@ Via AARDVARK connector
 
 ## Usage
 
+> [!NOTE]  
+> Starting with firmware v0.3.0, some obsolete functionality was removed in favor of [XboxPostcodeMonitor](https://github.com/xboxoneresearch/XboxPostcodeMonitor).
+> 
+> See <https://github.com/xboxoneresearch/PicoDurangoPOST/pull/11> for details.
+
 - Download [latest release](https://github.com/xboxoneresearch/PicoDurangoPOST/releases/latest)
 - Flash the firmware onto the Pi Pico
   - Disconnect Pi Pico from your PC
@@ -129,12 +134,15 @@ Model: SSD1306 0.91" 128x32 pixels, monochrome
 
 ![OLED Display with POST code](./assets/display.jpg)
 
+NOTE: This image is showing firmware v0.2.3 - starting with v0.3.0 POST code names are not shown on display anymore, see note in [Usage](#usage).
 
 ## Screenshots
 
 This is showing the output of firmware v0.2.0.
 
 ![Example output](./assets/screenshot2.png)
+
+NOTE: This screenshot is showing firmware v0.2.3 - starting with v0.3.0 POST code names are not shown via serial anymore, see note in [Usage](#usage).
 
 ## Develop
 
