@@ -30,7 +30,6 @@ enum State {
     STATE_RETURN_TO_REPL,
     STATE_REPL,
     STATE_POST_MONITOR,
-    STATE_I2C_SCAN,
     STATE_TOGGLE_TIMESTAMP,
     STATE_TOGGLE_COLORS,
     STATE_DISPLAY_MIRROR,
@@ -44,8 +43,7 @@ enum State {
 // For communication between core0/1
 enum CrossThreadMsg: uint32_t {
     INVALID = 0,
-    SCAN_I2C = 1,
-    RESET_TIMESTAMP = 2
+    RESET_TIMESTAMP = 1
 };
 
 typedef struct {
@@ -53,52 +51,6 @@ typedef struct {
     uint8_t segments;
     uint64_t timestamp;
 } SegmentData, *PSegmentData;
-
-typedef struct {
-    uint8_t address;
-    const char *name;
-} I2cDevice, *PI2cDevice;
-
-static I2cDevice KnownDevices[] = {
-    {0x15, "V_NBCORE"},
-    {0x16, "V5_P0"},
-    {0x18, "V_MEMIOAB"},
-    {0x19, "V_MEMIOCD"},
-    {0x20, "V_GFXCORE / V_CPUCORE"},
-    {0x21, "V_MEMPHY/V_MEMIO/V_SOC"},
-    {0x24, "GPIO EXPANDER (UNUSED)"},
-
-    {0x2D, "V_DRAM1P8 DEBUG (UNUSED)"},
-    {0x2E, "V_SOC1P8 DEBUG (UNUSED)"},
-    {0x2F, "V_SOCPHY DEBUG (UNUSED)"},
-
-    {0x40, "RAMVPP MONITOR (UNUSED)"},
-    {0x41, "M2 MONITOR (UNUSED)"},
-    {0x42, "CFEXPRESS MONITOR (UNUSED)"},
-    {0x44, "12P0 MONITOR (UNUSED)"},
-    {0x45, "12P0_SB MONITOR (UNUSED)"},
-    {0x4A, "V_SOC1P8 MONITOR (UNUSED)"},
-    {0x4B, "V_SOCPHY MONITOR (UNUSED)"},
-
-    {0x38, "MAX6958/9A"},
-    {0x39, "MAX6958/9B"},
-    
-    {0x5A, "RF Unit (ISD9160)"},
-};
-
-const uint16_t KNOWN_DEVICES_COUNT = sizeof(KnownDevices) / sizeof(I2cDevice);
-
-static const char* getDeviceNameForI2cAddress(uint8_t addr) {
-    int pos = 0;
-    while (pos < KNOWN_DEVICES_COUNT) {
-        if (KnownDevices[pos].address == addr) {
-            return KnownDevices[pos].name;
-        }
-        pos++;
-    }
-
-    return "<UNKNOWN>";
-}
 
 enum MAX6958Registers {
     NoOp = 0x00,

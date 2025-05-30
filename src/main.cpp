@@ -3,9 +3,6 @@
 #include "codes.h"
 #include "config.h"
 
-// Used to indicate I2C scan finish from core1->core0
-#define I2C_SCAN_FINISHED 0xFF
-
 #if true
 // Only enqueue segment if segment's lower nibble > 0
 #define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
@@ -46,28 +43,6 @@ String inputBuffer = "";
 Config cfg;
 RuntimeState runtimeState;
 
-bool postCodeToName(uint8_t segment, uint16_t code, char *outName, bool *isErrorCode) {
-    bool ret = false;
-    CodeFlavor flavor = (CodeFlavor)(segment & 0xF0);
-
-    switch (flavor) {
-        case CODE_FLAVOR_SMC:
-            ret = getNameForSmcCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_SP:
-            ret = getNameForSpCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_CPU:
-            ret = getNameForCpuCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_OS:
-            ret = getNameForOsCode(segment, code, outName, isErrorCode);
-            break;
-    }
-
-    return ret;
-}
-
 uint16_t segmentDigitsToCode(SegmentData *segData) {
     uint16_t code = 0;
     code |= segData->digits[0] & 0x0F;
@@ -97,10 +72,11 @@ void printFwVersion(bool startup = false) {
 void printHelp() {
     Serial.println("PicoDurangoPOST - by XboxOneResearch\r\n");
     Serial.println("Website: https://xboxresearch.com");
+    Serial.println("Errorcode DB: https://errors.xboxresearch.com");
     Serial.println("Source: https://github.com/XboxOneResearch/PicoDurangoPOST");
+    Serial.println("Serial monitor: https://github.com/xboxoneresearch/XboxPostcodeMonitor");
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
-    Serial.println("  scan    - Scan for I2C devices");
     // Modifiers for POST monitor
     Serial.println("\r\nPOST modifiers:");
     Serial.println("  ts      - Toggle showing timestamps");
@@ -132,8 +108,6 @@ void handleRepl() {
                 inputBuffer.trim();
                 if (inputBuffer == "post") {
                     runtimeState.setCurrentState(STATE_POST_MONITOR);
-                } else if (inputBuffer == "scan") {
-                    runtimeState.setCurrentState(STATE_I2C_SCAN);
                 } else if (inputBuffer == "rotate") {
                     runtimeState.setCurrentState(STATE_DISPLAY_ROTATE);
                 } else if (inputBuffer == "mirror") {
@@ -173,15 +147,11 @@ void printRegisters() {
 }
 
 void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
-    bool isErrorCode = false;
-    char *codeName = (char*)calloc(1, 255);
-
-    bool success = postCodeToName(segment, code, codeName, &isErrorCode);
     const char *flavor = getCodeFlavorForSegment(segment);
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
 
-    runtimeState.display()->printCode(code, flavor, success ? codeName: NULL, segmentNibble);
+    runtimeState.display()->printCode(code, flavor, segmentNibble);
     
     // Color is only printed if `printColors` is set
     PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
@@ -189,21 +159,7 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     PRINT_COLOR(COLOR_SEG_INDEX, Serial.print(segmentNibble));
     Serial.print("): ");
 
-    if (isErrorCode) {
-        PRINT_COLOR(COLOR_ERROR, Serial.printf("0x%04x", code))
-    } else {
-        PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
-    }
-
-    if (success && strlen(codeName) > 0) {
-        Serial.print(" [");
-        if (isErrorCode) {
-            PRINT_COLOR(COLOR_ERROR, Serial.print(codeName))
-        } else {
-            PRINT_COLOR(COLOR_NAME, Serial.print(codeName))
-        }
-        Serial.print("]");
-    }
+    PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
 
     if (cfg.isPostPrintTimestamps()) {
         Serial.print(" (");
@@ -213,24 +169,24 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     }
 
     Serial.println();
-
-    free(codeName);
 }
 
 /* CORE 1 START */
 
 void core1_receiveI2cData(int howMany) {
+    uint8_t recvd_byte = 0;
     int reg = -1;
     while (Wire.available()) {
+        recvd_byte = Wire.read();
         if (reg == -1 || reg == FactoryReserved || reg == MAX6958_REGISTER_SIZE) {
             // First byte of a packet is the CMD / target register address
             // NOTE: Register Configuration (0x04) is always sent alone
             // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
             // If Register is > MAX6958_REGISTER_SIZE, also expect a new packet following
-            reg = Wire.read();
+            reg = recvd_byte;
         } else {
-            runtimeState.setRegister(reg, Wire.read());
-            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
+            runtimeState.setRegister(reg, recvd_byte);
+            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, recvd_byte);
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
@@ -255,27 +211,6 @@ void core1_receiveI2cData(int howMany) {
     }
 }
 
-void core1_i2cScan(TwoWire *interface) {
-    interface->begin();
-
-    // As I2C Master, scan for available devices on the bus
-    for (uint8_t addr = 1; addr < 0x7F; addr++) {
-        // The i2c_scanner uses the return value of
-        // the Write.endTransmisstion to see if
-        // a device acknowledged the transfer to the address.
-        interface->beginTransmission(addr);
-        // Check if transmission succeeded
-        // If true, device @ address is available
-        if (interface->endTransmission() == 0) {
-            rp2040.fifo.push(addr);
-        }
-    }
-    // Signal that scan is finished
-    rp2040.fifo.push(I2C_SCAN_FINISHED);
-
-    interface->end();
-}
-
 void setup1() {
     Wire.setSDA(PIN_SDA_XBOX);
     Wire.setSCL(PIN_SCL_XBOX);
@@ -285,20 +220,9 @@ void setup1() {
 }
 
 void loop1() {
-    // Just handle I2C interrupts in the background or react to message from core0 to do I2C Scan
+    // Just handle I2C interrupts in the background or react to message from core0
     if (rp2040.fifo.available() && rp2040.fifo.pop_nb(&msg_core0)) {
         switch (msg_core0) {
-            case SCAN_I2C:
-                // Stop I2C slave
-                Wire.end();
-
-                // Do I2C scan as master
-                core1_i2cScan(&Wire);
-
-                // Start slave operation again
-                Wire.begin(MAX6958_ADDRESS);
-                Wire.onReceive(core1_receiveI2cData);
-                break;
             case RESET_TIMESTAMP:
                 runtimeState.resetTimestamp();
                 runtimeState.clearPostCodeQueue();
@@ -314,31 +238,6 @@ void loop1() {
 inline void sendMessageToCore1(CrossThreadMsg msg) {
     rp2040.fifo.push_nb(msg);
 }
-
-void scanForAvailableDevices() {
-    int error = 0;
-    int nDevices = 0;
-    // Instruct core1 to scan for available devices on the bus
-    Serial.println("Scanning for I2C devices...");
-    sendMessageToCore1(SCAN_I2C);
-    sleep_ms(1000);
-
-    uint32_t address = 0;
-    // Get enumerated addresses from core1 until "SCAN_FINISHED" is signaled
-    while (rp2040.fifo.pop_nb(&address) && address != I2C_SCAN_FINISHED) {
-        uint8_t addr_u8 = address & 0xFF;
-        const char *deviceName = getDeviceNameForI2cAddress(addr_u8);
-
-        Serial.printf("- Address: %i (hex: 0x%02x) [%s]\r\n", addr_u8, addr_u8, deviceName);
-        nDevices++;
-    }
-
-    if (nDevices > 0)
-        Serial.printf("Found %d devices on I2C Bus\r\n", nDevices);
-    else
-        Serial.println("No devices found on I2C bus...");
-}
-
 
 void setup() {
 #if WAIT_FOR_SERIAL
@@ -400,12 +299,6 @@ void loop() {
                     printCode(code, currentSegData.segments, currentSegData.timestamp);
                 }
             }
-            break;
-            
-        case STATE_I2C_SCAN:
-            scanForAvailableDevices();
-            // After scan, jump right back into REPL
-            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_DISPLAY_ROTATE:
             runtimeState.display()->toggleRotation();
