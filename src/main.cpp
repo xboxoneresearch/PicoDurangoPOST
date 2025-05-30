@@ -43,28 +43,6 @@ String inputBuffer = "";
 Config cfg;
 RuntimeState runtimeState;
 
-bool postCodeToName(uint8_t segment, uint16_t code, char *outName, bool *isErrorCode) {
-    bool ret = false;
-    CodeFlavor flavor = (CodeFlavor)(segment & 0xF0);
-
-    switch (flavor) {
-        case CODE_FLAVOR_SMC:
-            ret = getNameForSmcCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_SP:
-            ret = getNameForSpCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_CPU:
-            ret = getNameForCpuCode(segment, code, outName, isErrorCode);
-            break;
-        case CODE_FLAVOR_OS:
-            ret = getNameForOsCode(segment, code, outName, isErrorCode);
-            break;
-    }
-
-    return ret;
-}
-
 uint16_t segmentDigitsToCode(SegmentData *segData) {
     uint16_t code = 0;
     code |= segData->digits[0] & 0x0F;
@@ -168,14 +146,11 @@ void printRegisters() {
 
 void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     bool isErrorCode = false;
-    char *codeName = (char*)calloc(1, 255);
-
-    bool success = postCodeToName(segment, code, codeName, &isErrorCode);
     const char *flavor = getCodeFlavorForSegment(segment);
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
 
-    runtimeState.display()->printCode(code, flavor, success ? codeName: NULL, segmentNibble);
+    runtimeState.display()->printCode(code, flavor, segmentNibble);
     
     // Color is only printed if `printColors` is set
     PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
@@ -189,16 +164,6 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
         PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
     }
 
-    if (success && strlen(codeName) > 0) {
-        Serial.print(" [");
-        if (isErrorCode) {
-            PRINT_COLOR(COLOR_ERROR, Serial.print(codeName))
-        } else {
-            PRINT_COLOR(COLOR_NAME, Serial.print(codeName))
-        }
-        Serial.print("]");
-    }
-
     if (cfg.isPostPrintTimestamps()) {
         Serial.print(" (");
         PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("%.0f", timestamp / 1000.0))
@@ -207,8 +172,6 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     }
 
     Serial.println();
-
-    free(codeName);
 }
 
 /* CORE 1 START */

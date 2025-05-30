@@ -92,7 +92,7 @@ void Display::printCenteredH(char *text, int16_t x, int16_t y) {
     display.println(text);
 }
 
-void Display::printCode(uint16_t code, const char *flavor, const char *name, uint8_t segmentNibble) {
+void Display::printCode(uint16_t code, const char *flavor, uint8_t segmentNibble) {
     if (!initialized) {
         return;
     }
@@ -117,13 +117,6 @@ void Display::printCode(uint16_t code, const char *flavor, const char *name, uin
 
     if (isDisplayLandscape()) {
         display.setTextSize(1);
-
-        // In landscape orientation, also print POST-code name
-        if (name != NULL) {
-            printCenteredH((char *)name);
-        } else {
-            printCenteredH((char *)"UNKNOWN");
-        }
 
         // Print Code flavor in the top-left corner
         display.setCursor(0,0);
