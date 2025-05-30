@@ -77,7 +77,7 @@ Generally:
 
 - On Startup, it directly goes into POST monitoring mode.
 - If you hit "CTRL+C" you will be brought into the REPL-menu.
-- Here you can set various options or scan for I2C devices on the bus.
+- Here you can set various options
 - Check out the "help" command.
 
 Jump to the [Connection diagram](#connection-diagram)

@@ -3,9 +3,6 @@
 #include "codes.h"
 #include "config.h"
 
-// Used to indicate I2C scan finish from core1->core0
-#define I2C_SCAN_FINISHED 0xFF
-
 #if true
 // Only enqueue segment if segment's lower nibble > 0
 #define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
@@ -100,7 +97,6 @@ void printHelp() {
     Serial.println("Source: https://github.com/XboxOneResearch/PicoDurangoPOST");
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
-    Serial.println("  scan    - Scan for I2C devices");
     // Modifiers for POST monitor
     Serial.println("\r\nPOST modifiers:");
     Serial.println("  ts      - Toggle showing timestamps");
@@ -132,8 +128,6 @@ void handleRepl() {
                 inputBuffer.trim();
                 if (inputBuffer == "post") {
                     runtimeState.setCurrentState(STATE_POST_MONITOR);
-                } else if (inputBuffer == "scan") {
-                    runtimeState.setCurrentState(STATE_I2C_SCAN);
                 } else if (inputBuffer == "rotate") {
                     runtimeState.setCurrentState(STATE_DISPLAY_ROTATE);
                 } else if (inputBuffer == "mirror") {
@@ -255,27 +249,6 @@ void core1_receiveI2cData(int howMany) {
     }
 }
 
-void core1_i2cScan(TwoWire *interface) {
-    interface->begin();
-
-    // As I2C Master, scan for available devices on the bus
-    for (uint8_t addr = 1; addr < 0x7F; addr++) {
-        // The i2c_scanner uses the return value of
-        // the Write.endTransmisstion to see if
-        // a device acknowledged the transfer to the address.
-        interface->beginTransmission(addr);
-        // Check if transmission succeeded
-        // If true, device @ address is available
-        if (interface->endTransmission() == 0) {
-            rp2040.fifo.push(addr);
-        }
-    }
-    // Signal that scan is finished
-    rp2040.fifo.push(I2C_SCAN_FINISHED);
-
-    interface->end();
-}
-
 void setup1() {
     Wire.setSDA(PIN_SDA_XBOX);
     Wire.setSCL(PIN_SCL_XBOX);
@@ -285,20 +258,9 @@ void setup1() {
 }
 
 void loop1() {
-    // Just handle I2C interrupts in the background or react to message from core0 to do I2C Scan
+    // Just handle I2C interrupts in the background or react to message from core0
     if (rp2040.fifo.available() && rp2040.fifo.pop_nb(&msg_core0)) {
         switch (msg_core0) {
-            case SCAN_I2C:
-                // Stop I2C slave
-                Wire.end();
-
-                // Do I2C scan as master
-                core1_i2cScan(&Wire);
-
-                // Start slave operation again
-                Wire.begin(MAX6958_ADDRESS);
-                Wire.onReceive(core1_receiveI2cData);
-                break;
             case RESET_TIMESTAMP:
                 runtimeState.resetTimestamp();
                 runtimeState.clearPostCodeQueue();
@@ -314,31 +276,6 @@ void loop1() {
 inline void sendMessageToCore1(CrossThreadMsg msg) {
     rp2040.fifo.push_nb(msg);
 }
-
-void scanForAvailableDevices() {
-    int error = 0;
-    int nDevices = 0;
-    // Instruct core1 to scan for available devices on the bus
-    Serial.println("Scanning for I2C devices...");
-    sendMessageToCore1(SCAN_I2C);
-    sleep_ms(1000);
-
-    uint32_t address = 0;
-    // Get enumerated addresses from core1 until "SCAN_FINISHED" is signaled
-    while (rp2040.fifo.pop_nb(&address) && address != I2C_SCAN_FINISHED) {
-        uint8_t addr_u8 = address & 0xFF;
-        const char *deviceName = getDeviceNameForI2cAddress(addr_u8);
-
-        Serial.printf("- Address: %i (hex: 0x%02x) [%s]\r\n", addr_u8, addr_u8, deviceName);
-        nDevices++;
-    }
-
-    if (nDevices > 0)
-        Serial.printf("Found %d devices on I2C Bus\r\n", nDevices);
-    else
-        Serial.println("No devices found on I2C bus...");
-}
-
 
 void setup() {
 #if WAIT_FOR_SERIAL
@@ -400,12 +337,6 @@ void loop() {
                     printCode(code, currentSegData.segments, currentSegData.timestamp);
                 }
             }
-            break;
-            
-        case STATE_I2C_SCAN:
-            scanForAvailableDevices();
-            // After scan, jump right back into REPL
-            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_DISPLAY_ROTATE:
             runtimeState.display()->toggleRotation();
