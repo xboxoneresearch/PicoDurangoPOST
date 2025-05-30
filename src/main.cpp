@@ -174,17 +174,19 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
 /* CORE 1 START */
 
 void core1_receiveI2cData(int howMany) {
+    uint8_t recvd_byte = 0;
     int reg = -1;
     while (Wire.available()) {
+        recvd_byte = Wire.read();
         if (reg == -1 || reg == FactoryReserved || reg == MAX6958_REGISTER_SIZE) {
             // First byte of a packet is the CMD / target register address
             // NOTE: Register Configuration (0x04) is always sent alone
             // If we are at Register FactoryReserved (0x05), we read the register/command again, as it will be the start of a new packet
             // If Register is > MAX6958_REGISTER_SIZE, also expect a new packet following
-            reg = Wire.read();
+            reg = recvd_byte;
         } else {
-            runtimeState.setRegister(reg, Wire.read());
-            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, registers[reg]);
+            runtimeState.setRegister(reg, recvd_byte);
+            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, recvd_byte);
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
