@@ -73,6 +73,7 @@ void printHelp() {
     Serial.println("PicoDurangoPOST - by XboxOneResearch\r\n");
     Serial.println("Website: https://xboxresearch.com");
     Serial.println("Source: https://github.com/XboxOneResearch/PicoDurangoPOST");
+    Serial.println("Serial monitor: https://github.com/xboxoneresearch/XboxPostcodeMonitor");
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
     // Modifiers for POST monitor
