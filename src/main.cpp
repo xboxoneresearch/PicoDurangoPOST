@@ -145,7 +145,6 @@ void printRegisters() {
 }
 
 void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
-    bool isErrorCode = false;
     const char *flavor = getCodeFlavorForSegment(segment);
     // Lower nibble of segment == position of code when > u16?
     uint8_t segmentNibble = segment & 0x0F;
@@ -158,11 +157,7 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
     PRINT_COLOR(COLOR_SEG_INDEX, Serial.print(segmentNibble));
     Serial.print("): ");
 
-    if (isErrorCode) {
-        PRINT_COLOR(COLOR_ERROR, Serial.printf("0x%04x", code))
-    } else {
-        PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
-    }
+    PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
 
     if (cfg.isPostPrintTimestamps()) {
         Serial.print(" (");
