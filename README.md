@@ -49,9 +49,14 @@ Via AARDVARK connector
   - The removable storage should automatically disappear
   - You are ready to go!
 
-- Listen on the exposed USB Serial interface, Baudrate: **115200** (via PuTTy or similar UART monitor software)
-  - How to use PuTTY? Check this [Link](https://www.ssh.com/academy/ssh/putty/windows)
-  - Tip: Make use of **Saving a session configuration**, no need to re-type Serial-port and baudrate each time!
+- Listen on the exposed USB Serial interface, Baudrate: **115200** via Serial monitor software
+  - [XboxPostcodeMonitor](https://github.com/xboxoneresearch/XboxPostcodeMonitor) is recommended
+    - Has errorcode auto-updating from <https://errors.xboxresearch.com>
+    - Multi-console compatibility
+  - PuTTY or any other generic serial monitor software
+    - PuTTy: Check this [Link](https://www.ssh.com/academy/ssh/putty/windows)
+    - Tip: Make use of **Saving a session configuration**, no need to re-type Serial-port and baudrate each time!
+    - Downside: No multi-console functionality, no errorcode updating
 
 ### How to interact ?
 
