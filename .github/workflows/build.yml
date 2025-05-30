@@ -32,6 +32,7 @@ jobs:
       - name: Copy files into dist/
         run: |
           cp .pio/build/pico/firmware.uf2 dist/durango_post_monitor.uf2
+          cp .pio/build/pico2/firmware.uf2 dist/durango_post_monitor_pico2.uf2
           cp README.md dist/
       
       - name: Upload artifacts
@@ -54,6 +55,7 @@ jobs:
         run: |
           mkdir release/
           cp durango_post_monitor.uf2 release/
+          cp durango_post_monitor_pico2.uf2 release/
           cp README.md release/
           cd release/
           7z a ../pico-durango-post-${{ github.ref_name }}.zip *
