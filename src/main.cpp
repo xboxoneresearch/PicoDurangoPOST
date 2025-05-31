@@ -3,7 +3,7 @@
 #include "codes.h"
 #include "config.h"
 
-#if true
+#if false
 // Only enqueue segment if segment's lower nibble > 0
 #define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
 #else
