@@ -265,7 +265,7 @@ void setup() {
         Serial.println("No display detected :(");
     }
 
-    printFwVersion(true);
+    printFwVersion(false);
     Serial.println("POST Reader I2C");
 }
 
