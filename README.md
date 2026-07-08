@@ -16,6 +16,8 @@ This software flashed to the Raspberry Pi Pico allows for monitoring of POST cod
     - [Optional: 0.91" OLED Display (SSD1306)](#optional-091-oled-display-ssd1306)
   - [Screenshots](#screenshots)
   - [Develop](#develop)
+    - [VS Code](#vs-code)
+    - [Zed Editor](#zed-editor)
 
 ## Supported consoles
 
@@ -146,7 +148,32 @@ NOTE: This screenshot is showing firmware v0.2.3 - starting with v0.3.0 POST cod
 
 ## Develop
 
+### VS Code
+
 - Use **VS Code** as your IDE / Code Editor
 - Install the extension [**PlatformIO**](https://platformio.org/)
 - Edit the code
 - Change to the **PlatformIO**-tab in VS Code and choose **Upload and Monitor** to compile and upload the code
+
+### Zed Editor
+
+- Use **Zed** as your IDE / Code Editor
+- Install [**PlatformIO Core (CLI)**](https://docs.platformio.org/en/latest/core/installation/index.html)
+- Generate a compilation database so `clangd` can resolve includes: `pio run -e pico -t compiledb`
+- Add a `.zed/settings.json` pointing `clangd` at the ARM toolchain so it picks up the cross-compiler's built-in headers:
+  ```json
+  {
+    "lsp": {
+      "clangd": {
+        "binary": {
+          "arguments": [
+            "--query-driver=<path-to-.platformio>/packages/toolchain-rp2040-earlephilhower/bin/*"
+          ]
+        }
+      }
+    }
+  }
+  ```
+- Edit the code
+- Compile and upload with `pio run -e pico -t upload`, monitor with `pio device monitor -b 115200`
+- Re-run the `compiledb` command whenever `platformio.ini` deps/envs change, since the database goes stale otherwise
