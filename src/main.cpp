@@ -88,6 +88,7 @@ void printHelp() {
     Serial.println("  save    - Save config");
     Serial.println("\r\nGeneral:");
     Serial.println("  version - Show firmware version");
+    Serial.println("  bootsel - Reboot into USB bootloader mode (for flashing UF2)");
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
 }
@@ -124,6 +125,8 @@ void handleRepl() {
                     runtimeState.setCurrentState(STATE_PRINT_VERSION);
                 } else if (inputBuffer == "help") {
                     runtimeState.setCurrentState(STATE_PRINT_HELP);
+                } else if (inputBuffer == "bootsel") {
+                    runtimeState.setCurrentState(STATE_BOOTSEL);
                 } else {
                     Serial.println("Unknown command. Type 'help' for available commands.");
                 }
@@ -342,6 +345,11 @@ void loop() {
         case STATE_PRINT_HELP:
             printHelp();
             runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+            break;
+        case STATE_BOOTSEL:
+            print("Notice", "Rebooting into bootloader mode...");
+            delay(100);  // let the message flush over serial before we vanish
+            rp2040.rebootToBootloader();
             break;
     }
 
