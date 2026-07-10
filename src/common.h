@@ -38,6 +38,7 @@ enum State {
     STATE_CONFIG_SAVE,
     STATE_PRINT_VERSION,
     STATE_PRINT_HELP,
+    STATE_BOOTSEL,
 };
 
 // For communication between core0/1
