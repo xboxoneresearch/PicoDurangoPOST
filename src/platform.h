@@ -16,6 +16,15 @@ static inline void rebootToBootloader() { rp2040.rebootToBootloader(); }
 static inline void platformStartCore1() {} // arduino-pico already runs setup1()/loop1()
 static inline void platformPumpCore1() {}
 
+static inline bool platformSupportsI2C0PinChange() { return true; }
+
+// RP2040/RP2350 GPIO function-select: I2C SDA/SCL alternate with GPIO parity,
+// and I2C0 vs I2C1 alternates every other pair ((gpio/2) % 2). Getting this
+// wrong doesn't fail gracefully - Wire.setSDA()/setSCL() panic-reboot the
+// board on an unsupported pin, so bad input must be rejected before that.
+static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 28 && (pin % 4) == 0; }
+static inline bool isValidI2C0SclPin(uint8_t pin) { return pin <= 28 && (pin % 4) == 1; }
+
 #elif defined(ARDUINO_ARCH_ESP32)
 
 #include <esp_timer.h>
@@ -45,6 +54,17 @@ static inline void platformStartCore1() {
 }
 static inline void platformPumpCore1() {}
 
+static inline bool platformSupportsI2C0PinChange() { return true; }
+
+// ESP32's I2C is routed through the GPIO matrix, so almost any GPIO works.
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 48; }
+#else
+// GPIO34-39 are input-only on classic ESP32 and can't drive an open-drain I2C line.
+static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 39 && !(pin >= 34 && pin <= 39); }
+#endif
+static inline bool isValidI2C0SclPin(uint8_t pin) { return isValidI2C0SdaPin(pin); }
+
 #elif defined(TEENSYDUINO)
 
 // Teensy 4.x (imxrt1062) is single-core with no bundled RTOS: there's no
@@ -73,6 +93,12 @@ void loop1();
 
 static inline void platformStartCore1() { setup1(); }
 static inline void platformPumpCore1() { loop1(); }
+
+// Wire/Wire1/Wire2 pins are wired to fixed silicon pads on Teensy 4.x, not
+// software-remappable, so there's nothing to validate or change.
+static inline bool platformSupportsI2C0PinChange() { return false; }
+static inline bool isValidI2C0SdaPin(uint8_t) { return false; }
+static inline bool isValidI2C0SclPin(uint8_t) { return false; }
 
 #else
 #error "Unsupported platform - only RP2040, ESP32 and Teensy 4.x are supported"

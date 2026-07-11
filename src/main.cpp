@@ -41,6 +41,8 @@ SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
 
 String inputBuffer = "";
+uint8_t pendingI2C0Sda = 0;
+uint8_t pendingI2C0Scl = 0;
 
 Config cfg;
 RuntimeState runtimeState;
@@ -88,6 +90,8 @@ void printHelp() {
     Serial.println("\r\nConfig:");
     Serial.println("  config  - Show config");
     Serial.println("  save    - Save config");
+    Serial.println("\r\nI2C:");
+    Serial.println("  i2c0 <sda> <scl> - Change I2C0 (Xbox bus) pins (use 'save' to persist)");
     Serial.println("\r\nGeneral:");
     Serial.println("  version - Show firmware version");
 #if defined(ARDUINO_ARCH_RP2040)
@@ -104,12 +108,14 @@ void printHelp() {
 void handleRepl() {
     if (Serial.available()) {
         char c = Serial.read();
-        
+        // Letters for command names, digits + space for "i2c0 <sda> <scl>"-style args
+        bool isBufferable = isalnum(c) || c == ' ';
+
         // Echo character in REPL mode
-        if (runtimeState.getCurrentState() == STATE_REPL && isalpha(c)) {
+        if (runtimeState.getCurrentState() == STATE_REPL && isBufferable) {
             Serial.write(c);
         }
-        
+
         // Handle newline
         if (c == '\n' || c == '\r') {
             Serial.println("");
@@ -135,6 +141,20 @@ void handleRepl() {
                     runtimeState.setCurrentState(STATE_PRINT_HELP);
                 } else if (inputBuffer == "bootsel") {
                     runtimeState.setCurrentState(STATE_BOOTSEL);
+                } else if (inputBuffer.startsWith("i2c0")) {
+                    String args = inputBuffer.substring(4);
+                    args.trim();
+                    int spaceIdx = args.indexOf(' ');
+                    String sdaStr = spaceIdx > 0 ? args.substring(0, spaceIdx) : "";
+                    String sclStr = spaceIdx > 0 ? args.substring(spaceIdx + 1) : "";
+                    sclStr.trim();
+                    if (sdaStr.length() > 0 && sclStr.length() > 0) {
+                        pendingI2C0Sda = (uint8_t)sdaStr.toInt();
+                        pendingI2C0Scl = (uint8_t)sclStr.toInt();
+                        runtimeState.setCurrentState(STATE_SET_I2C0_PINS);
+                    } else {
+                        Serial.println("Usage: i2c0 <sda_pin> <scl_pin>");
+                    }
                 } else {
                     Serial.println("Unknown command. Type 'help' for available commands.");
                 }
@@ -143,7 +163,7 @@ void handleRepl() {
             if (runtimeState.getCurrentState() == STATE_REPL) {
                 Serial.print(">> ");  // REPL prompt after command
             }
-        } else if (isalpha(c)) {
+        } else if (isBufferable) {
             inputBuffer += c;
         }
     }
@@ -228,27 +248,40 @@ void core1_receiveI2cData(int howMany) {
     }
 }
 
-void setup1() {
+void initXboxWire(uint8_t sdaPin, uint8_t sclPin) {
 #if defined(ARDUINO_ARCH_RP2040)
-    Wire.setSDA(PIN_SDA_XBOX);
-    Wire.setSCL(PIN_SCL_XBOX);
+    Wire.setSDA(sdaPin);
+    Wire.setSCL(sclPin);
     Wire.begin(MAX6958_ADDRESS);
 #elif defined(ARDUINO_ARCH_ESP32)
-    Wire.begin((uint8_t)MAX6958_ADDRESS, PIN_SDA_XBOX, PIN_SCL_XBOX);
+    Wire.begin((uint8_t)MAX6958_ADDRESS, sdaPin, sclPin);
 #elif defined(TEENSYDUINO)
     Wire.begin(MAX6958_ADDRESS); // pins fixed in hardware, not configurable
 #endif
     Wire.onReceive(core1_receiveI2cData);
 }
 
+void setup1() {
+    initXboxWire(runtimeState.getXboxSdaPin(), runtimeState.getXboxSclPin());
+}
+
 void loop1() {
     // React to message from core0, if any (INVALID = nothing pending)
     uint32_t msg = msg_core0.exchange(INVALID, std::memory_order_relaxed);
-    switch (msg) {
+    uint8_t msgType = msg & 0xFF;
+    switch (msgType) {
         case RESET_TIMESTAMP:
             runtimeState.resetTimestamp();
             runtimeState.clearPostCodeQueue();
             break;
+        case SET_I2C0_PINS: {
+            uint8_t sda = (msg >> 8) & 0xFF;
+            uint8_t scl = (msg >> 16) & 0xFF;
+            Wire.end();
+            initXboxWire(sda, scl);
+            runtimeState.setXboxI2CPins(sda, scl);
+            break;
+        }
     }
 }
 
@@ -256,7 +289,7 @@ void loop1() {
 
 /* CORE 0 START */
 
-inline void sendMessageToCore1(CrossThreadMsg msg) {
+inline void sendMessageToCore1(uint32_t msg) {
     msg_core0.store(msg, std::memory_order_relaxed);
 }
 
@@ -272,6 +305,13 @@ void setup() {
     if (!cfg.begin()) {
         Serial.println("Failed to load config");
     }
+
+    // Restore persisted I2C0 (Xbox bus) pins, if they differ from the
+    // compile-time defaults setup1() starts with. Going through the same
+    // cross-thread message the REPL "i2c0" command uses means this works
+    // regardless of whether core1 has started running setup1() yet - the
+    // message just waits in the mailbox until loop1() picks it up.
+    sendMessageToCore1(packSetI2C0PinsMsg(cfg.getXboxSdaPin(), cfg.getXboxSclPin()));
 
     if (runtimeState.begin()) {
         Serial.println("SSD1306 Display detected :)");
@@ -353,6 +393,7 @@ void loop() {
             Serial.printf("Disp rotation portrait: %s\r\n", cfg.isRotationPortrait() ? "ON" : "OFF");
             Serial.printf("Print timestamps:       %s\r\n", cfg.isPostPrintTimestamps() ? "ON" : "OFF");
             Serial.printf("Print colors:           %s\r\n", cfg.isSerialPrintColors() ? "ON" : "OFF");
+            Serial.printf("I2C0 pins (Xbox bus):   SDA=%u SCL=%u\r\n", cfg.getXboxSdaPin(), cfg.getXboxSclPin());
             runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
             break;
         case STATE_CONFIG_SAVE:
@@ -373,6 +414,25 @@ void loop() {
             delay(100);  // let the message flush over serial before we vanish
             rebootToBootloader();
             break;
+        case STATE_SET_I2C0_PINS: {
+            char msg[64];
+            if (!platformSupportsI2C0PinChange()) {
+                print("Error", "I2C0 pins are fixed in hardware on this platform");
+            } else if (!isValidI2C0SdaPin(pendingI2C0Sda)) {
+                snprintf(msg, sizeof(msg), "GPIO%u is not a valid I2C0 SDA pin", pendingI2C0Sda);
+                print("Error", msg);
+            } else if (!isValidI2C0SclPin(pendingI2C0Scl)) {
+                snprintf(msg, sizeof(msg), "GPIO%u is not a valid I2C0 SCL pin", pendingI2C0Scl);
+                print("Error", msg);
+            } else {
+                sendMessageToCore1(packSetI2C0PinsMsg(pendingI2C0Sda, pendingI2C0Scl));
+                cfg.setXboxI2CPins(pendingI2C0Sda, pendingI2C0Scl);
+                snprintf(msg, sizeof(msg), "I2C0 pins set to SDA=%u SCL=%u (type 'save' to persist)", pendingI2C0Sda, pendingI2C0Scl);
+                print("Notice", msg);
+            }
+            runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+            break;
+        }
     }
 
     // Check for CTRL+C
