@@ -57,7 +57,10 @@ Via AARDVARK connector
   - You are ready to go!
 
 > [!NOTE]
-> ESP32 boards are also supported (`pio run -e esp32 -t upload`, or `-e esp32s3` for ESP32-S3), see [pin mapping](#connection-diagram) below.
+> ESP32 boards are also supported, see [pin mapping](#connection-diagram) below.
+>
+> - From source: `pio run -e esp32 -t upload` (or `-e esp32s3` for ESP32-S3)
+> - From a release: flash `durango_post_monitor_esp32.bin` / `durango_post_monitor_esp32s3.bin` with `esptool.py write_flash 0x0 <file>.bin`
 > There's no drag-and-drop UF2 flow for ESP32 — flash it with PlatformIO/esptool over serial instead.
 
 - Listen on the exposed USB Serial interface, Baudrate: **115200** via Serial monitor software
