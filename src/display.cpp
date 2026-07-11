@@ -8,6 +8,8 @@ bool Display::begin(uint8_t sdaPin, uint8_t sclPin) {
     twoWirePort->begin();
 #elif defined(ARDUINO_ARCH_ESP32)
     twoWirePort->begin(sdaPin, sclPin);
+#elif defined(TEENSYDUINO)
+    twoWirePort->begin(); // pins fixed in hardware, not configurable
 #endif
 
     twoWirePort->beginTransmission(address);

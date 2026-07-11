@@ -41,14 +41,26 @@ const ConfigData DEFAULT_CONFIG = {
     .post_print_timestamps = 1
 };
 
+// RP2040/ESP32 emulate EEPROM in flash and need an explicit begin(size) /
+// commit() / end(); Teensy's EEPROM is written through directly, no buffering.
+#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_ESP32)
+#define EEPROM_NEEDS_COMMIT 1
+#else
+#define EEPROM_NEEDS_COMMIT 0
+#endif
+
 class Config {
     public:
         ~Config() {
+#if EEPROM_NEEDS_COMMIT
             EEPROM.end();
+#endif
         }
 
         bool begin() {
+#if EEPROM_NEEDS_COMMIT
             EEPROM.begin(EEPROM_SIZE);
+#endif
             ConfigHeader tmpHeader = {0};
             EEPROM.get(CONFIG_ADDR, tmpHeader);
             
@@ -88,7 +100,11 @@ class Config {
             // Write header and data
             EEPROM.put(CONFIG_ADDR, header);
             EEPROM.put(CONFIG_ADDR + CFG_HEADER_SIZE, data);
+#if EEPROM_NEEDS_COMMIT
             return EEPROM.commit();
+#else
+            return true;
+#endif
         }
 
         // Getters

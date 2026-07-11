@@ -57,11 +57,16 @@ Via AARDVARK connector
   - You are ready to go!
 
 > [!NOTE]
-> ESP32 boards are also supported, see [pin mapping](#connection-diagram) below.
+> ESP32 and Teensy 4 boards are also supported, see [pin mapping](#connection-diagram) below.
 >
+> ESP32 / ESP32-S3 (no drag-and-drop UF2 flow, flash over serial instead):
 > - From source: `pio run -e esp32 -t upload` (or `-e esp32s3` for ESP32-S3)
 > - From a release: flash `durango_post_monitor_esp32.bin` / `durango_post_monitor_esp32s3.bin` with `esptool.py write_flash 0x0 <file>.bin`
-> There's no drag-and-drop UF2 flow for ESP32 — flash it with PlatformIO/esptool over serial instead.
+>
+> Teensy 4.0 / 4.1:
+> - From source: `pio run -e teensy40 -t upload` (or `-e teensy41`)
+> - From a release: flash `durango_post_monitor_teensy40.hex` / `durango_post_monitor_teensy41.hex` with [Teensy Loader](https://www.pjrc.com/teensy/loader.html) or `teensy_loader_cli`
+> - Experimental: Teensyduino's built-in `Wire` slave mode has known reliability quirks on Teensy 4 in community reports. Test on real hardware before relying on it; the [teensy4_i2c](https://github.com/Richard-Gemmell/teensy4_i2c) library is the documented fallback if POST codes get dropped or garbled.
 
 - Listen on the exposed USB Serial interface, Baudrate: **115200** via Serial monitor software
   - [XboxPostcodeMonitor](https://github.com/xboxoneresearch/XboxPostcodeMonitor) is recommended
@@ -142,6 +147,12 @@ ESP32-S3 (env `esp32s3`) -> FACET / AARDVARK
 - SCL: ESP32-S3 **GPIO9** -> FACET **Pin 25** (AARDVARK **Pin 1** on Series S/X)
 - GND -> GND
 
+Teensy 4.0 / 4.1 (envs `teensy40` / `teensy41`) -> FACET / AARDVARK
+
+- SDA: Teensy **Pin 18** (Wire, fixed in hardware) -> FACET **Pin 26** (AARDVARK **Pin 3** on Series S/X)
+- SCL: Teensy **Pin 19** (Wire, fixed in hardware) -> FACET **Pin 25** (AARDVARK **Pin 1** on Series S/X)
+- GND -> GND
+
 ### Optional: 0.91" OLED Display (SSD1306)
 
 Model: SSD1306 0.91" 128x32 pixels, monochrome
@@ -167,6 +178,13 @@ ESP32-S3:
 - ESP32-S3 3V3 -> Display VCC
 - SDA: ESP32-S3 **GPIO4** -> Display **Pin SDA**
 - SCL: ESP32-S3 **GPIO5** -> Display **Pin SCL**
+- GND -> GND
+
+Teensy 4.0 / 4.1:
+
+- Teensy 3V3 -> Display VCC
+- SDA: Teensy **Pin 17** (Wire1, fixed in hardware) -> Display **Pin SDA**
+- SCL: Teensy **Pin 16** (Wire1, fixed in hardware) -> Display **Pin SCL**
 - GND -> GND
 
 ![OLED Display with POST code](./assets/display.jpg)
