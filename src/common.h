@@ -121,8 +121,12 @@ public:
     inline void setRegister(uint8_t reg, uint8_t value) { registers[reg] = value; }
     inline uint8_t getRegister(uint8_t reg) { return registers[reg]; }
 
-    inline void resetTimestamp() { timestamp = now_us64(); }
-    inline uint64_t getTimestamp() { return timestamp; }
+    inline void resetTimestamp() { prevPrintedTimestamp = 0; }
+    inline uint64_t nextPrintedTimestampDelta(uint64_t ts) {
+        uint64_t result = prevPrintedTimestamp == 0 ? 0 : ts - prevPrintedTimestamp;
+        prevPrintedTimestamp = ts;
+        return result;
+    }
 
     inline Display *display() { return &_display; }
 
@@ -137,7 +141,7 @@ public:
     }
     inline void clearPostCodeQueue() { _postCodeQueue.clean(); }
 private:
-    uint64_t timestamp = now_us64();
+    uint64_t prevPrintedTimestamp = 0;
     State currentState = STATE_POST_MONITOR;
     uint8_t registers[MAX6958_REGISTER_SIZE];
     bool initialized = false;

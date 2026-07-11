@@ -172,10 +172,16 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
 
     PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
 
+    uint64_t delta = runtimeState.nextPrintedTimestampDelta(timestamp);
+
     if (cfg.isPostPrintTimestamps()) {
         Serial.print(" (");
-        PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("%.0f", timestamp / 1000.0))
-        Serial.print(" ms");
+        if (delta == 0) {
+            PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("%llu", delta))
+        } else {
+            PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("+%llu", delta))
+        }
+        Serial.print(" uS");
         Serial.print(")");
     }
 
@@ -201,8 +207,8 @@ void core1_receiveI2cData(int howMany) {
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
-                // Get uS relative to last timer reset
-                segData.timestamp = now_us64() - runtimeState.getTimestamp();
+
+                segData.timestamp = now_us64();
                 segData.segments  = runtimeState.getRegister(Segments);
                 segData.digits[0] = runtimeState.getRegister(Digit0);
                 segData.digits[1] = runtimeState.getRegister(Digit1);
