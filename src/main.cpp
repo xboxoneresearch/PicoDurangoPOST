@@ -94,6 +94,8 @@ void printHelp() {
     Serial.println("  bootsel - Reboot into USB bootloader mode (for flashing UF2)");
 #elif defined(ARDUINO_ARCH_ESP32)
     Serial.println("  bootsel - Restart (use esptool/DTR-RTS auto-reset to flash)");
+#elif defined(TEENSYDUINO)
+    Serial.println("  bootsel - Reboot into HalfKay bootloader (for Teensy Loader)");
 #endif
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
@@ -227,6 +229,8 @@ void setup1() {
     Wire.begin(MAX6958_ADDRESS);
 #elif defined(ARDUINO_ARCH_ESP32)
     Wire.begin((uint8_t)MAX6958_ADDRESS, PIN_SDA_XBOX, PIN_SCL_XBOX);
+#elif defined(TEENSYDUINO)
+    Wire.begin(MAX6958_ADDRESS); // pins fixed in hardware, not configurable
 #endif
     Wire.onReceive(core1_receiveI2cData);
 }
@@ -283,6 +287,8 @@ void setup() {
 }
 
 void loop() {
+    platformPumpCore1();
+
     switch (runtimeState.getCurrentState()) {
         case STATE_RETURN_TO_REPL:
             if (postMonitorRunning) {
