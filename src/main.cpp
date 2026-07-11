@@ -1,3 +1,5 @@
+#include <atomic>
+
 #include "common.h"
 #include "colors.h"
 #include "codes.h"
@@ -33,7 +35,7 @@
 
 
 // Message from core0->core1
-uint32_t msg_core0 = 0;
+std::atomic<uint32_t> msg_core0{INVALID};
 
 SegmentData currentSegData = {0};
 bool postMonitorRunning = false;
@@ -88,6 +90,13 @@ void printHelp() {
     Serial.println("  save    - Save config");
     Serial.println("\r\nGeneral:");
     Serial.println("  version - Show firmware version");
+#if defined(ARDUINO_ARCH_RP2040)
+    Serial.println("  bootsel - Reboot into USB bootloader mode (for flashing UF2)");
+#elif defined(ARDUINO_ARCH_ESP32)
+    Serial.println("  bootsel - Restart (use esptool/DTR-RTS auto-reset to flash)");
+#elif defined(TEENSYDUINO)
+    Serial.println("  bootsel - Reboot into HalfKay bootloader (for Teensy Loader)");
+#endif
     Serial.println("  help    - Show this help message");
     Serial.println("  CTRL+C  - Exit current mode and return to REPL");
 }
@@ -124,6 +133,8 @@ void handleRepl() {
                     runtimeState.setCurrentState(STATE_PRINT_VERSION);
                 } else if (inputBuffer == "help") {
                     runtimeState.setCurrentState(STATE_PRINT_HELP);
+                } else if (inputBuffer == "bootsel") {
+                    runtimeState.setCurrentState(STATE_BOOTSEL);
                 } else {
                     Serial.println("Unknown command. Type 'help' for available commands.");
                 }
@@ -196,6 +207,7 @@ void core1_receiveI2cData(int howMany) {
             if (reg == Segments) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
+
                 segData.timestamp = time_us_64();
                 segData.segments  = runtimeState.getRegister(Segments);
                 segData.digits[0] = runtimeState.getRegister(Digit0);
@@ -217,31 +229,35 @@ void core1_receiveI2cData(int howMany) {
 }
 
 void setup1() {
+#if defined(ARDUINO_ARCH_RP2040)
     Wire.setSDA(PIN_SDA_XBOX);
     Wire.setSCL(PIN_SCL_XBOX);
-
     Wire.begin(MAX6958_ADDRESS);
+#elif defined(ARDUINO_ARCH_ESP32)
+    Wire.begin((uint8_t)MAX6958_ADDRESS, PIN_SDA_XBOX, PIN_SCL_XBOX);
+#elif defined(TEENSYDUINO)
+    Wire.begin(MAX6958_ADDRESS); // pins fixed in hardware, not configurable
+#endif
     Wire.onReceive(core1_receiveI2cData);
 }
 
 void loop1() {
-    // Just handle I2C interrupts in the background or react to message from core0
-    if (rp2040.fifo.available() && rp2040.fifo.pop_nb(&msg_core0)) {
-        switch (msg_core0) {
-            case RESET_TIMESTAMP:
-                runtimeState.resetTimestamp();
-                runtimeState.clearPostCodeQueue();
-                break;
-        }
+    // React to message from core0, if any (INVALID = nothing pending)
+    uint32_t msg = msg_core0.exchange(INVALID, std::memory_order_relaxed);
+    switch (msg) {
+        case RESET_TIMESTAMP:
+            runtimeState.resetTimestamp();
+            runtimeState.clearPostCodeQueue();
+            break;
     }
 }
 
-/* CORE 1 START */
+/* CORE 1 END */
 
 /* CORE 0 START */
 
 inline void sendMessageToCore1(CrossThreadMsg msg) {
-    rp2040.fifo.push_nb(msg);
+    msg_core0.store(msg, std::memory_order_relaxed);
 }
 
 void setup() {
@@ -272,9 +288,13 @@ void setup() {
 
     printFwVersion(true);
     Serial.println("POST Reader I2C");
+
+    platformStartCore1();
 }
 
 void loop() {
+    platformPumpCore1();
+
     switch (runtimeState.getCurrentState()) {
         case STATE_RETURN_TO_REPL:
             if (postMonitorRunning) {
@@ -347,6 +367,11 @@ void loop() {
         case STATE_PRINT_HELP:
             printHelp();
             runtimeState.setCurrentState(STATE_RETURN_TO_REPL);
+            break;
+        case STATE_BOOTSEL:
+            print("Notice", "Rebooting into bootloader mode...");
+            delay(100);  // let the message flush over serial before we vanish
+            rebootToBootloader();
             break;
     }
 

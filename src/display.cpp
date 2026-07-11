@@ -2,10 +2,16 @@
 #include "common.h"
 
 bool Display::begin(uint8_t sdaPin, uint8_t sclPin) {
+#if defined(ARDUINO_ARCH_RP2040)
     twoWirePort->setSDA(sdaPin);
     twoWirePort->setSCL(sclPin);
- 
     twoWirePort->begin();
+#elif defined(ARDUINO_ARCH_ESP32)
+    twoWirePort->begin(sdaPin, sclPin);
+#elif defined(TEENSYDUINO)
+    twoWirePort->begin(); // pins fixed in hardware, not configurable
+#endif
+
     twoWirePort->beginTransmission(address);
     auto err = twoWirePort->endTransmission();
     twoWirePort->end();
@@ -43,7 +49,7 @@ void Display::printMessage(const char* header, const char *text, int durationMs)
     display.display();
 
     if (durationMs > 0) {
-        sleep_ms(durationMs);
+        delay(durationMs);
         display.clearDisplay();
     }
 

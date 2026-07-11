@@ -26,6 +26,27 @@ jobs:
       - name: Build PlatformIO Project
         run: pio run
 
+      - name: Merge ESP32 images into single flashable binaries
+        run: |
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)
+          ESPTOOL=~/.platformio/packages/tool-esptoolpy/esptool.py
+
+          python3 "$ESPTOOL" --chip esp32 merge_bin \
+            -o .pio/build/esp32/durango_post_monitor_esp32.bin \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            0x1000 .pio/build/esp32/bootloader.bin \
+            0x8000 .pio/build/esp32/partitions.bin \
+            0xe000 "$BOOT_APP0" \
+            0x10000 .pio/build/esp32/firmware.bin
+
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin \
+            -o .pio/build/esp32s3/durango_post_monitor_esp32s3.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 8MB \
+            0x0 .pio/build/esp32s3/bootloader.bin \
+            0x8000 .pio/build/esp32s3/partitions.bin \
+            0xe000 "$BOOT_APP0" \
+            0x10000 .pio/build/esp32s3/firmware.bin
+
       - name: Create dist directory
         run: mkdir dist/
 
@@ -33,6 +54,10 @@ jobs:
         run: |
           cp .pio/build/pico/firmware.uf2 dist/durango_post_monitor.uf2
           cp .pio/build/pico2/firmware.uf2 dist/durango_post_monitor_pico2.uf2
+          cp .pio/build/esp32/durango_post_monitor_esp32.bin dist/
+          cp .pio/build/esp32s3/durango_post_monitor_esp32s3.bin dist/
+          cp .pio/build/teensy40/firmware.hex dist/durango_post_monitor_teensy40.hex
+          cp .pio/build/teensy41/firmware.hex dist/durango_post_monitor_teensy41.hex
           cp README.md dist/
       
       - name: Upload artifacts
@@ -56,6 +81,10 @@ jobs:
           mkdir release/
           cp durango_post_monitor.uf2 release/
           cp durango_post_monitor_pico2.uf2 release/
+          cp durango_post_monitor_esp32.bin release/
+          cp durango_post_monitor_esp32s3.bin release/
+          cp durango_post_monitor_teensy40.hex release/
+          cp durango_post_monitor_teensy41.hex release/
           cp README.md release/
           cd release/
           7z a ../pico-durango-post-${{ github.ref_name }}.zip *

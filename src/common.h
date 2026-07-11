@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <cppQueue.h>
 #include "display.h"
+#include "platform.h"
 
 /* DISPLAY */
 #define DISP_SCREEN_WIDTH 128
@@ -38,6 +39,7 @@ enum State {
     STATE_CONFIG_SAVE,
     STATE_PRINT_VERSION,
     STATE_PRINT_HELP,
+    STATE_BOOTSEL,
 };
 
 // For communication between core0/1
@@ -110,7 +112,6 @@ static const char *getNameForMAX6958Register(uint8_t reg) {
 class RuntimeState {
 public:
     RuntimeState();
-    ~RuntimeState();
 
     bool begin();
 
