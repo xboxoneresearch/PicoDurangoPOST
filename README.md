@@ -57,7 +57,7 @@ Via AARDVARK connector
   - You are ready to go!
 
 > [!NOTE]
-> ESP32 boards are also supported (`pio run -e esp32 -t upload`), see [pin mapping](#connection-diagram) below.
+> ESP32 boards are also supported (`pio run -e esp32 -t upload`, or `-e esp32s3` for ESP32-S3), see [pin mapping](#connection-diagram) below.
 > There's no drag-and-drop UF2 flow for ESP32 — flash it with PlatformIO/esptool over serial instead.
 
 - Listen on the exposed USB Serial interface, Baudrate: **115200** via Serial monitor software
@@ -133,6 +133,12 @@ ESP32 (env `esp32`) -> FACET / AARDVARK
 - SCL: ESP32 **GPIO22** -> FACET **Pin 25** (AARDVARK **Pin 1** on Series S/X)
 - GND -> GND
 
+ESP32-S3 (env `esp32s3`) -> FACET / AARDVARK
+
+- SDA: ESP32-S3 **GPIO8** -> FACET **Pin 26** (AARDVARK **Pin 3** on Series S/X)
+- SCL: ESP32-S3 **GPIO9** -> FACET **Pin 25** (AARDVARK **Pin 1** on Series S/X)
+- GND -> GND
+
 ### Optional: 0.91" OLED Display (SSD1306)
 
 Model: SSD1306 0.91" 128x32 pixels, monochrome
@@ -151,6 +157,13 @@ ESP32:
 - ESP32 3V3 -> Display VCC
 - SDA: ESP32 **GPIO18** -> Display **Pin SDA**
 - SCL: ESP32 **GPIO19** -> Display **Pin SCL**
+- GND -> GND
+
+ESP32-S3:
+
+- ESP32-S3 3V3 -> Display VCC
+- SDA: ESP32-S3 **GPIO4** -> Display **Pin SDA**
+- SCL: ESP32-S3 **GPIO5** -> Display **Pin SCL**
 - GND -> GND
 
 ![OLED Display with POST code](./assets/display.jpg)
