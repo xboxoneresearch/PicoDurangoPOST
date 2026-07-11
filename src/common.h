@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <cppQueue.h>
 #include "display.h"
+#include "platform.h"
 
 /* DISPLAY */
 #define DISP_SCREEN_WIDTH 128
@@ -111,7 +112,6 @@ static const char *getNameForMAX6958Register(uint8_t reg) {
 class RuntimeState {
 public:
     RuntimeState();
-    ~RuntimeState();
 
     bool begin();
 
@@ -121,7 +121,7 @@ public:
     inline void setRegister(uint8_t reg, uint8_t value) { registers[reg] = value; }
     inline uint8_t getRegister(uint8_t reg) { return registers[reg]; }
 
-    inline void resetTimestamp() { timestamp = time_us_64(); }
+    inline void resetTimestamp() { timestamp = now_us64(); }
     inline uint64_t getTimestamp() { return timestamp; }
 
     inline Display *display() { return &_display; }
@@ -137,7 +137,7 @@ public:
     }
     inline void clearPostCodeQueue() { _postCodeQueue.clean(); }
 private:
-    uint64_t timestamp = time_us_64();
+    uint64_t timestamp = now_us64();
     State currentState = STATE_POST_MONITOR;
     uint8_t registers[MAX6958_REGISTER_SIZE];
     bool initialized = false;
