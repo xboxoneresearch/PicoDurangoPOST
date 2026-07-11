@@ -22,8 +22,14 @@ static inline bool platformSupportsI2C0PinChange() { return true; }
 // and I2C0 vs I2C1 alternates every other pair ((gpio/2) % 2). Getting this
 // wrong doesn't fail gracefully - Wire.setSDA()/setSCL() panic-reboot the
 // board on an unsupported pin, so bad input must be rejected before that.
-static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 28 && (pin % 4) == 0; }
-static inline bool isValidI2C0SclPin(uint8_t pin) { return pin <= 28 && (pin % 4) == 1; }
+// GPIO0/1 (this board's own default Xbox-bus pins) are valid I2C0 SDA/SCL.
+static inline constexpr bool isValidI2C0Pins(uint8_t sda, uint8_t scl) {
+    return sda <= 28 && scl <= 28 && (sda % 4) == 0 && (scl % 4) == 1 && scl - sda == 1;
+}
+static_assert(isValidI2C0Pins(0, 1), "GPIO0/1 must be valid I2C0 pins on RP2040");
+static_assert(isValidI2C0Pins(4, 5), "GPIO4/5 must be valid I2C0 pins on RP2040");
+static_assert(!isValidI2C0Pins(2, 3), "GPIO2/3 belong to I2C1, not I2C0");
+static_assert(!isValidI2C0Pins(1, 0), "SDA/SCL roles are fixed per pin, can't be swapped");
 
 #elif defined(ARDUINO_ARCH_ESP32)
 
@@ -56,14 +62,17 @@ static inline void platformPumpCore1() {}
 
 static inline bool platformSupportsI2C0PinChange() { return true; }
 
-// ESP32's I2C is routed through the GPIO matrix, so almost any GPIO works.
+// ESP32's I2C is routed through the GPIO matrix, so almost any GPIO works
+// for either role - the one hard rule is SDA and SCL can't be the same pin.
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 48; }
+static inline constexpr bool isValidI2C0Pin(uint8_t pin) { return pin <= 48; }
 #else
 // GPIO34-39 are input-only on classic ESP32 and can't drive an open-drain I2C line.
-static inline bool isValidI2C0SdaPin(uint8_t pin) { return pin <= 39 && !(pin >= 34 && pin <= 39); }
+static inline constexpr bool isValidI2C0Pin(uint8_t pin) { return pin <= 39 && !(pin >= 34 && pin <= 39); }
 #endif
-static inline bool isValidI2C0SclPin(uint8_t pin) { return isValidI2C0SdaPin(pin); }
+static inline constexpr bool isValidI2C0Pins(uint8_t sda, uint8_t scl) {
+    return sda != scl && isValidI2C0Pin(sda) && isValidI2C0Pin(scl);
+}
 
 #elif defined(TEENSYDUINO)
 
@@ -97,8 +106,7 @@ static inline void platformPumpCore1() { loop1(); }
 // Wire/Wire1/Wire2 pins are wired to fixed silicon pads on Teensy 4.x, not
 // software-remappable, so there's nothing to validate or change.
 static inline bool platformSupportsI2C0PinChange() { return false; }
-static inline bool isValidI2C0SdaPin(uint8_t) { return false; }
-static inline bool isValidI2C0SclPin(uint8_t) { return false; }
+static inline constexpr bool isValidI2C0Pins(uint8_t, uint8_t) { return false; }
 
 #else
 #error "Unsupported platform - only RP2040, ESP32 and Teensy 4.x are supported"

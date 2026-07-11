@@ -418,11 +418,8 @@ void loop() {
             char msg[64];
             if (!platformSupportsI2C0PinChange()) {
                 print("Error", "I2C0 pins are fixed in hardware on this platform");
-            } else if (!isValidI2C0SdaPin(pendingI2C0Sda)) {
-                snprintf(msg, sizeof(msg), "GPIO%u is not a valid I2C0 SDA pin", pendingI2C0Sda);
-                print("Error", msg);
-            } else if (!isValidI2C0SclPin(pendingI2C0Scl)) {
-                snprintf(msg, sizeof(msg), "GPIO%u is not a valid I2C0 SCL pin", pendingI2C0Scl);
+            } else if (!isValidI2C0Pins(pendingI2C0Sda, pendingI2C0Scl)) {
+                snprintf(msg, sizeof(msg), "SDA=%u SCL=%u is not a valid I2C0 pin pair", pendingI2C0Sda, pendingI2C0Scl);
                 print("Error", msg);
             } else {
                 sendMessageToCore1(packSetI2C0PinsMsg(pendingI2C0Sda, pendingI2C0Scl));
