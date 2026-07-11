@@ -208,7 +208,7 @@ void core1_receiveI2cData(int howMany) {
                 // Signal that we have a new POST code
                 SegmentData segData = {0};
 
-                segData.timestamp = time_us_64();
+                segData.timestamp = now_us64();
                 segData.segments  = runtimeState.getRegister(Segments);
                 segData.digits[0] = runtimeState.getRegister(Digit0);
                 segData.digits[1] = runtimeState.getRegister(Digit1);
