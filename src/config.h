@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <CRC.h>
 
-#define CFG_VERSION  1
+#define CFG_VERSION  2
 #define CONFIG_ADDR  0x0
 #define EEPROM_SIZE  256
 #define CONFIG_MAGIC 0x30474643 // CFG0
@@ -21,7 +21,9 @@ typedef struct {
     uint8_t  disp_rotation_portrait; /* 0x01 */
     uint8_t  serial_print_colors;    /* 0x02 */
     uint8_t  post_print_timestamps;  /* 0x03 */
-} ConfigData, *PConfigData;          /* Total len: 0x04 */
+    uint8_t  xbox_sda_pin;           /* 0x04 */
+    uint8_t  xbox_scl_pin;           /* 0x05 */
+} ConfigData, *PConfigData;          /* Total len: 0x06 */
 
 const uint8_t CFG_HEADER_SIZE = sizeof(ConfigHeader);
 const uint8_t CFG_DATA_SIZE = sizeof(ConfigData);
@@ -31,6 +33,8 @@ enum ConfigValues {
     CFG_ROTATION_PORTRAIT = 1,
     CFG_PRINT_COLORS = 2,
     CFG_PRINT_TIMESTAMPS = 3,
+    CFG_XBOX_SDA_PIN = 4,
+    CFG_XBOX_SCL_PIN = 5,
 };
 
 // Default configuration values
@@ -38,7 +42,9 @@ const ConfigData DEFAULT_CONFIG = {
     .disp_mirrored = 0,
     .disp_rotation_portrait = 0,
     .serial_print_colors = 1,
-    .post_print_timestamps = 1
+    .post_print_timestamps = 1,
+    .xbox_sda_pin = PIN_SDA_XBOX,
+    .xbox_scl_pin = PIN_SCL_XBOX,
 };
 
 // RP2040/ESP32 emulate EEPROM in flash and need an explicit begin(size) /
@@ -63,13 +69,24 @@ class Config {
 #endif
             ConfigHeader tmpHeader = {0};
             EEPROM.get(CONFIG_ADDR, tmpHeader);
-            
-            // Check if config is valid
-            if (
-                tmpHeader.magic != CONFIG_MAGIC
-                || (tmpHeader.version < CFG_VERSION && !upgradeConfig(tmpHeader))
-                || tmpHeader.data_length != CFG_DATA_SIZE
-            ) {
+
+            if (tmpHeader.magic != CONFIG_MAGIC) {
+                // Invalid config, initialize with defaults
+                initDefaultConfig();
+                return true;
+            }
+
+            if (tmpHeader.version < CFG_VERSION) {
+                // upgradeConfig() reads the old (smaller) data itself, since
+                // its on-disk layout/size differs from the current one, then
+                // saves it back out in the current layout.
+                if (!upgradeConfig(tmpHeader)) {
+                    initDefaultConfig();
+                }
+                return true;
+            }
+
+            if (tmpHeader.data_length != CFG_DATA_SIZE) {
                 // Invalid config, initialize with defaults
                 initDefaultConfig();
                 return true;
@@ -77,7 +94,7 @@ class Config {
 
             // Read data
             EEPROM.get(CONFIG_ADDR + CFG_HEADER_SIZE, data);
-            
+
             // Verify checksum
             uint16_t calcChecksum = calcCRC16((uint8_t*)&data, CFG_DATA_SIZE);
             if (calcChecksum != tmpHeader.checksum) {
@@ -112,12 +129,15 @@ class Config {
         bool isRotationPortrait() const { return data.disp_rotation_portrait; }
         bool isSerialPrintColors() const { return data.serial_print_colors; }
         bool isPostPrintTimestamps() const { return data.post_print_timestamps; }
+        uint8_t getXboxSdaPin() const { return data.xbox_sda_pin; }
+        uint8_t getXboxSclPin() const { return data.xbox_scl_pin; }
 
         // Setters
         void setDisplayMirrored(bool value) { data.disp_mirrored = value; }
         void setRotationPortrait(bool value) { data.disp_rotation_portrait = value; }
         void setSerialPrintColors(bool value) { data.serial_print_colors = value; }
         void setPostPrintTimestamps(bool value) { data.post_print_timestamps = value; }
+        void setXboxI2CPins(uint8_t sda, uint8_t scl) { data.xbox_sda_pin = sda; data.xbox_scl_pin = scl; }
 
         // Togglers
         void toggleDisplayMirrored() { data.disp_mirrored = !data.disp_mirrored; }
@@ -141,14 +161,30 @@ class Config {
         bool upgradeConfig(ConfigHeader& oldHeader) {
             // Perform version-specific upgrades
             switch (oldHeader.version) {
-                case 1:
-                    // Extend whenever we reach a new version
+                case 1: {
+                    // v1's ConfigData was 4 bytes (no xbox_sda_pin/xbox_scl_pin
+                    // yet). Read exactly that many bytes so we don't pull in
+                    // unrelated flash contents past the old struct's length.
+                    struct {
+                        uint8_t disp_mirrored;
+                        uint8_t disp_rotation_portrait;
+                        uint8_t serial_print_colors;
+                        uint8_t post_print_timestamps;
+                    } oldData;
+                    EEPROM.get(CONFIG_ADDR + CFG_HEADER_SIZE, oldData);
+                    data.disp_mirrored = oldData.disp_mirrored;
+                    data.disp_rotation_portrait = oldData.disp_rotation_portrait;
+                    data.serial_print_colors = oldData.serial_print_colors;
+                    data.post_print_timestamps = oldData.post_print_timestamps;
+                    data.xbox_sda_pin = DEFAULT_CONFIG.xbox_sda_pin;
+                    data.xbox_scl_pin = DEFAULT_CONFIG.xbox_scl_pin;
                     break;
+                }
 
                 default:
                     return false; // Unknown version
             }
-            
+
             // Update version number and length
             oldHeader.version = CFG_VERSION;
             oldHeader.data_length = CFG_DATA_SIZE;

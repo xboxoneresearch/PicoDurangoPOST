@@ -40,13 +40,19 @@ enum State {
     STATE_PRINT_VERSION,
     STATE_PRINT_HELP,
     STATE_BOOTSEL,
+    STATE_SET_I2C0_PINS,
 };
 
 // For communication between core0/1
 enum CrossThreadMsg: uint32_t {
     INVALID = 0,
-    RESET_TIMESTAMP = 1
+    RESET_TIMESTAMP = 1,
+    SET_I2C0_PINS = 2, // low byte = this code, byte 1 = SDA pin, byte 2 = SCL pin
 };
+
+static inline uint32_t packSetI2C0PinsMsg(uint8_t sda, uint8_t scl) {
+    return (uint32_t)SET_I2C0_PINS | ((uint32_t)sda << 8) | ((uint32_t)scl << 16);
+}
 
 typedef struct {
     uint8_t digits[4];
@@ -130,6 +136,10 @@ public:
 
     inline Display *display() { return &_display; }
 
+    inline uint8_t getXboxSdaPin() { return xboxSdaPin; }
+    inline uint8_t getXboxSclPin() { return xboxSclPin; }
+    inline void setXboxI2CPins(uint8_t sda, uint8_t scl) { xboxSdaPin = sda; xboxSclPin = scl; }
+
     inline bool isPostCodeQueueFull() { return _postCodeQueue.isFull(); }
     inline bool isPostCodeQueueEmpty() { return _postCodeQueue.isEmpty(); }
     inline void pushPostCode(SegmentData* segData) { _postCodeQueue.push(segData); }
@@ -145,6 +155,8 @@ private:
     State currentState = STATE_POST_MONITOR;
     uint8_t registers[MAX6958_REGISTER_SIZE];
     bool initialized = false;
+    uint8_t xboxSdaPin = PIN_SDA_XBOX;
+    uint8_t xboxSclPin = PIN_SCL_XBOX;
 
     Display  _display;
     // Create a queue for POST codes
