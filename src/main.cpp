@@ -4,8 +4,9 @@
 #include "colors.h"
 #include "codes.h"
 #include "config.h"
+#include "platform.h"
 
-#if false
+#if true
 // Only enqueue segment if segment's lower nibble > 0
 #define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
 #else
@@ -46,16 +47,6 @@ uint8_t pendingI2C0Scl = 0;
 
 Config cfg;
 RuntimeState runtimeState;
-
-uint16_t segmentDigitsToCode(SegmentData *segData) {
-    uint16_t code = 0;
-    code |= segData->digits[0] & 0x0F;
-    code |= (segData->digits[1] & 0x0F) << 4;
-    code |= (segData->digits[2] & 0x0F) << 8;
-    code |= (segData->digits[3] & 0x0F) << 12;
-    return code;
-}
-
 
 void print(const char* header, const char *text, int durationMs = 0) {
     Serial.printf("%s: %s\r\n", header, text);
@@ -177,31 +168,20 @@ void printRegisters() {
     }
 }
 
-void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
-    const char *flavor = getCodeFlavorForSegment(segment);
-    // Lower nibble of segment == position of code when > u16?
-    uint8_t segmentNibble = segment & 0x0F;
-
-    runtimeState.display()->printCode(code, flavor, segmentNibble);
+void printCode(uint64_t code, CodeFlavor flavor, uint64_t timestamp) {
+    const char *flavor_str = getStringForCodeFlavor(flavor);
+    runtimeState.display()->printCode(code, flavor_str);
     
     // Color is only printed if `printColors` is set
-    PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor))
-    Serial.print(" (");
-    PRINT_COLOR(COLOR_SEG_INDEX, Serial.print(segmentNibble));
-    Serial.print("): ");
-
-    PRINT_COLOR(COLOR_CODE, Serial.printf("0x%04x", code))
+    PRINT_COLOR(COLOR_FLAVOR, Serial.print(flavor_str))
+    PRINT_COLOR(COLOR_CODE, Serial.printf(": 0x%llx", (unsigned long long)code))
 
     uint64_t delta = runtimeState.nextPrintedTimestampDelta(timestamp);
 
     if (cfg.isPostPrintTimestamps()) {
         Serial.print(" (");
-        if (delta == 0) {
-            PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("%llu", delta))
-        } else {
-            PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("+%llu", delta))
-        }
-        Serial.print(" uS");
+        PRINT_COLOR(COLOR_TIMESTAMP, Serial.printf("+%.3f", (double)delta / 1000.0))
+        Serial.print(" mS");
         Serial.print(")");
     }
 
@@ -213,6 +193,8 @@ void printCode(uint16_t code, uint8_t segment, uint64_t timestamp) {
 void core1_receiveI2cData(int howMany) {
     uint8_t recvd_byte = 0;
     int reg = -1;
+
+    uint16_t codeWord = 0;
     while (Wire.available()) {
         recvd_byte = Wire.read();
         if (reg == -1 || reg == FactoryReserved || reg == MAX6958_REGISTER_SIZE) {
@@ -223,28 +205,24 @@ void core1_receiveI2cData(int howMany) {
             reg = recvd_byte;
         } else {
             runtimeState.setRegister(reg, recvd_byte);
-            // Serial.printf("Register %s (0x%02x): 0x%02x\r\n", getNameForMAX6958Register(reg), reg, recvd_byte);
-            if (reg == Segments) {
-                // Signal that we have a new POST code
-                SegmentData segData = {0};
-
-                segData.timestamp = now_us64();
-                segData.segments  = runtimeState.getRegister(Segments);
-                segData.digits[0] = runtimeState.getRegister(Digit0);
-                segData.digits[1] = runtimeState.getRegister(Digit1);
-                segData.digits[2] = runtimeState.getRegister(Digit2);
-                segData.digits[3] = runtimeState.getRegister(Digit3);
-                
-                // Add code to queue if it's not full
-                if (SHOULD_ENQUEUE_SEGMENT(segData.segments) && !runtimeState.isPostCodeQueueFull()) {
-                    runtimeState.pushPostCode((SegmentData *)&segData);
-                }
+            // Serial.printf("Register %s (0x%02x): 0x%02x (ts: %llu)\r\n", getNameForMAX6958Register(reg), reg, recvd_byte, now_us64());
+            if (reg >= Digit0 && reg <= Digit3) {
+                // Shift lower nibble (4 bits) of digit to position in u16 value
+                codeWord |= (uint16_t)(recvd_byte & 0x0F) << (4 * (reg - Digit0));
+            } else if (reg == Segments) {
+                runtimeState.setSegmentCode(recvd_byte, codeWord);
+                codeWord = 0;
             }
             // After each byte the target register address is automatically incremented
             // This allow communication to be more dense
             // See: MAX6958 Datasheet, page 9 -> Command Address Autoincrementing
             reg++;
         }
+    }
+
+    // Add the assembled code
+    if (runtimeState.isCodeReady()) {
+        runtimeState.enqueueCode();
     }
 }
 
@@ -275,10 +253,14 @@ void loop1() {
             runtimeState.clearPostCodeQueue();
             break;
         case SET_I2C0_PINS: {
+            // Decode packed pins from message value
             uint8_t sda = (msg >> 8) & 0xFF;
             uint8_t scl = (msg >> 16) & 0xFF;
+            // Stop I2C slave handler
             Wire.end();
+            // Set new pin mapping
             initXboxWire(sda, scl);
+            // Restart I2C slave handler
             runtimeState.setXboxI2CPins(sda, scl);
             break;
         }
@@ -360,8 +342,7 @@ void loop() {
             // Process all codes in the queue
             while (!runtimeState.isPostCodeQueueEmpty()) {
                 if(runtimeState.popPostCode(&currentSegData)) {
-                    uint16_t code = segmentDigitsToCode(&currentSegData);
-                    printCode(code, currentSegData.segments, currentSegData.timestamp);
+                    printCode(currentSegData.code, currentSegData.flavor, currentSegData.timestamp);
                 }
             }
             break;
