@@ -32,6 +32,7 @@ enum State {
     STATE_RETURN_TO_REPL,
     STATE_REPL,
     STATE_POST_MONITOR,
+    STATE_LAST_CODES,
     STATE_TOGGLE_TIMESTAMP,
     STATE_TOGGLE_COLORS,
     STATE_DISPLAY_MIRROR,
@@ -182,8 +183,17 @@ public:
             .timestamp = now_us64(),
         };
         pushPostCode(&segData);
+        putCodeCache(segData.flavor, segData.code);
         resetCodeWords();
         currSegment = SegmentByte(0);
+    }
+
+    inline uint64_t getCachedCode(CodeIndex index) {
+        if (index >= CODE_IDX_MAX) {
+            return 0;
+        }
+
+        return codeCache[index];
     }
 private:
     uint64_t prevPrintedTimestamp = 0;
@@ -207,7 +217,6 @@ private:
         if (!isPostCodeQueueFull()) {
             _postCodeQueue.push(segData);
         }
-        putCodeCache(segData->flavor, segData->code);
     }
     
     inline bool putCodeCache(CodeFlavor flavor, uint64_t code) {

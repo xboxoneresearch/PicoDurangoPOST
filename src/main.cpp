@@ -346,6 +346,15 @@ void loop() {
                 }
             }
             break;
+        case STATE_LAST_CODES:
+            Serial.println("--- Last codes ---");
+            Serial.printf("CPU: 0x%llx\r\n", runtimeState.getCachedCode(CODE_IDX_CPU));
+            Serial.printf("SP : 0x%llx\r\n", runtimeState.getCachedCode(CODE_IDX_SP));
+            Serial.printf("SMC: 0x%llx\r\n", runtimeState.getCachedCode(CODE_IDX_SMC));
+            Serial.printf("OS : 0x%llx\r\n", runtimeState.getCachedCode(CODE_IDX_OS));
+            Serial.println("------------------");
+            runtimeState.setCurrentState(STATE_POST_MONITOR);
+            break;
         case STATE_DISPLAY_ROTATE:
             runtimeState.display()->toggleRotation();
             cfg.toggleRotationPortrait();
@@ -427,6 +436,9 @@ void loop() {
             case 'r':
                 sendMessageToCore1(RESET_TIMESTAMP);
                 Serial.println("Resetting timestamp");
+                break;
+            case 'l':
+                runtimeState.setCurrentState(STATE_LAST_CODES);
                 break;
         }
     }
