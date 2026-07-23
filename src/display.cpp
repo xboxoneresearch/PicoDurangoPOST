@@ -1,4 +1,5 @@
 
+#include "display.h"
 #include "common.h"
 
 bool Display::begin(uint8_t sdaPin, uint8_t sclPin) {
@@ -98,7 +99,7 @@ void Display::printCenteredH(char *text, int16_t x, int16_t y) {
     display.println(text);
 }
 
-void Display::printCode(uint16_t code, const char *flavor, uint8_t segmentNibble) {
+void Display::printCode(uint64_t code, const char *flavor) {
     if (!initialized) {
         return;
     }
@@ -113,7 +114,7 @@ void Display::printCode(uint16_t code, const char *flavor, uint8_t segmentNibble
 
     // Bigger size for landscape mode
     display.setTextSize(isDisplayLandscape() ? 3 : 1);
-    sprintf(codeBuf, "%04X\n", code);
+    snprintf(codeBuf, CODEBUF_SZ, "%llX\n", (unsigned long long)code);
 
     if (isDisplayLandscape()) {
         printCenteredH(codeBuf);
@@ -126,7 +127,7 @@ void Display::printCode(uint16_t code, const char *flavor, uint8_t segmentNibble
 
         // Print Code flavor in the top-left corner
         display.setCursor(0,0);
-        display.printf("%s\n(%i)", flavor, segmentNibble);
+        display.printf("%s", flavor);
 
         display.setTextSize(2);
     }

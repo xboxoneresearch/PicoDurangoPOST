@@ -2,6 +2,8 @@
 
 #include <Adafruit_SSD1306.h>
 
+#define CODEBUF_SZ 18
+
 enum DisplayRotation {
     DISPLAY_LANDSCAPE = 0,
     DISPLAY_PORTRAIT = 1, 
@@ -34,7 +36,8 @@ public:
         height = displayHeight;
         currentRotation = DISPLAY_LANDSCAPE;
         display = Adafruit_SSD1306(width, height, twoWirePort, -1);
-        codeBuf = (char *) calloc(5, 0);
+        // Up to 16 hex digits (uint64_t) + newline + NUL
+        codeBuf = (char *) calloc(1, CODEBUF_SZ);
     }
     ~Display() {
         if (codeBuf != NULL) {
@@ -98,7 +101,7 @@ public:
     void printMessage(const char *header, const char *text, int durationMs = 1000);
     void printCentered(const char *text, int16_t x = 0, int16_t y = 0);
     void printCenteredH(char *text, int16_t x = 0, int16_t y = 0);
-    void printCode(uint16_t code, const char *flavor, uint8_t segmentNibble);
+    void printCode(uint64_t code, const char *flavor);
 private:
     TwoWire *twoWirePort;
     uint8_t width;

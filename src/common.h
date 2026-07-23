@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <cppQueue.h>
+#include "codes.h"
 #include "display.h"
 #include "platform.h"
 
@@ -31,6 +32,7 @@ enum State {
     STATE_RETURN_TO_REPL,
     STATE_REPL,
     STATE_POST_MONITOR,
+    STATE_LAST_CODES,
     STATE_TOGGLE_TIMESTAMP,
     STATE_TOGGLE_COLORS,
     STATE_DISPLAY_MIRROR,
@@ -53,12 +55,6 @@ enum CrossThreadMsg: uint32_t {
 static inline uint32_t packSetI2C0PinsMsg(uint8_t sda, uint8_t scl) {
     return (uint32_t)SET_I2C0_PINS | ((uint32_t)sda << 8) | ((uint32_t)scl << 16);
 }
-
-typedef struct {
-    uint8_t digits[4];
-    uint8_t segments;
-    uint64_t timestamp;
-} SegmentData, *PSegmentData;
 
 enum MAX6958Registers {
     NoOp = 0x00,
@@ -142,7 +138,7 @@ public:
 
     inline bool isPostCodeQueueFull() { return _postCodeQueue.isFull(); }
     inline bool isPostCodeQueueEmpty() { return _postCodeQueue.isEmpty(); }
-    inline void pushPostCode(SegmentData* segData) { _postCodeQueue.push(segData); }
+
     inline bool popPostCode(SegmentData *segDataOut) {
         if (_postCodeQueue.getCount() > 0) {
             return _postCodeQueue.pop((SegmentData*)segDataOut);
@@ -150,8 +146,63 @@ public:
         return false;
     }
     inline void clearPostCodeQueue() { _postCodeQueue.clean(); }
+
+    inline void setSegmentCode(uint8_t segmentByte, uint16_t codeWord) {
+        uint8_t code_idx = 0;
+        switch (segmentByte & SEGMENT_INDEX_MASK) {
+            case 1:
+                code_idx = 0;
+                break;
+            case 2:
+                code_idx = 1;
+                break;
+            case 4:
+                code_idx = 2;
+                break;
+            case 8:
+                code_idx = 3;
+                break;
+            default:
+                return;
+        }
+
+        codeWords[code_idx] = codeWord;
+        currSegment = SegmentByte(segmentByte);
+    }
+
+    inline bool isCodeReady() {
+        // Codes come in MSB-first (index order: 8, 4, 2, 1)
+        // When index is 1, full code was transmitted from console
+        return currSegment.index() == 1;
+    }
+
+    inline void enqueueCode() {
+        SegmentData segData = {
+            .code = assembleCode(codeWords),
+            .flavor = currSegment.flavor(),
+            .timestamp = now_us64(),
+        };
+        pushPostCode(&segData);
+        putCodeCache(segData.flavor, segData.code);
+        resetCodeWords();
+        currSegment = SegmentByte(0);
+    }
+
+    inline uint64_t getCachedCode(CodeIndex index) {
+        if (index >= CODE_IDX_MAX) {
+            return 0;
+        }
+
+        return codeCache[index];
+    }
 private:
     uint64_t prevPrintedTimestamp = 0;
+
+    SegmentByte currSegment = SegmentByte(0);
+
+    uint16_t codeWords[POST_CODE_WORD_COUNT] = {0};
+    uint64_t codeCache[CODE_IDX_MAX] = {0};
+
     State currentState = STATE_POST_MONITOR;
     uint8_t registers[MAX6958_REGISTER_SIZE];
     bool initialized = false;
@@ -161,4 +212,26 @@ private:
     Display  _display;
     // Create a queue for POST codes
     cppQueue _postCodeQueue;
+
+    inline void pushPostCode(SegmentData* segData) {
+        if (!isPostCodeQueueFull()) {
+            _postCodeQueue.push(segData);
+        }
+    }
+    
+    inline bool putCodeCache(CodeFlavor flavor, uint64_t code) {
+        uint8_t index = getCodeIndexForFlavor(flavor);
+        if (index == CODE_IDX_INVALID) {
+            return false;
+        }
+        codeCache[index] = code;
+        return true;
+    }
+
+    inline void resetCodeWords() {
+        codeWords[0] = 0;
+        codeWords[1] = 0;
+        codeWords[2] = 0;
+        codeWords[3] = 0;
+    }
 };
