@@ -59,7 +59,7 @@ jobs:
           cp .pio/build/teensy40/firmware.hex dist/durango_post_monitor_teensy40.hex
           cp .pio/build/teensy41/firmware.hex dist/durango_post_monitor_teensy41.hex
           cp README.md dist/
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -81,10 +81,10 @@ jobs:
           mkdir release/
           cp durango_post_monitor.uf2 release/
           cp durango_post_monitor_pico2.uf2 release/
-          cp durango_post_monitor_esp32.bin release/
-          cp durango_post_monitor_esp32s3.bin release/
-          cp durango_post_monitor_teensy40.hex release/
-          cp durango_post_monitor_teensy41.hex release/
+#          cp durango_post_monitor_esp32.bin release/
+#          cp durango_post_monitor_esp32s3.bin release/
+#          cp durango_post_monitor_teensy40.hex release/
+#          cp durango_post_monitor_teensy41.hex release/
           cp README.md release/
           cd release/
           7z a ../pico-durango-post-${{ github.ref_name }}.zip *
