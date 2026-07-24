@@ -230,7 +230,7 @@ void initXboxWire(uint8_t sdaPin, uint8_t sclPin) {
     Wire.setSCL(sclPin);
     Wire.begin(MAX6958_ADDRESS);
 #elif defined(ARDUINO_ARCH_ESP32)
-    Wire.begin((uint8_t)MAX6958_ADDRESS, sdaPin, sclPin);
+    Wire.begin(MAX6958_ADDRESS, sdaPin, sclPin, 400000);
 #elif defined(TEENSYDUINO)
     Wire.begin(MAX6958_ADDRESS); // pins fixed in hardware, not configurable
 #endif
