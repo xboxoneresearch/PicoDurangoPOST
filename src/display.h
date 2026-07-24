@@ -1,12 +1,13 @@
 #pragma once
 
-#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+#include <U8g2lib.h>
 
 #define CODEBUF_SZ 18
 
 enum DisplayRotation {
     DISPLAY_LANDSCAPE = 0,
-    DISPLAY_PORTRAIT = 1, 
+    DISPLAY_PORTRAIT = 1,
 };
 
 // Internal enum only used in `getInternalRotation` / `Display::setRotation` !
@@ -17,25 +18,25 @@ enum INTERNAL_DisplayRotation {
     INTERNAL_DISP_ROTATION_PORTRAIT_MIRRORED = 3,
 };
 
-static inline INTERNAL_DisplayRotation getInternalRotation(DisplayRotation rotation, bool mirrored) {
+static inline const u8g2_cb_t *getInternalRotation(DisplayRotation rotation, bool mirrored) {
     if (rotation == DISPLAY_LANDSCAPE) {
-        return mirrored ? INTERNAL_DISP_ROTATION_LANDSCAPE_MIRRORED : INTERNAL_DISP_ROTATION_LANDSCAPE;
+        return mirrored ? U8G2_R2 : U8G2_R0;
     } else if (rotation == DISPLAY_PORTRAIT) {
-        return mirrored ? INTERNAL_DISP_ROTATION_PORTRAIT_MIRRORED : INTERNAL_DISP_ROTATION_PORTRAIT;
+        return mirrored ? U8G2_R3 : U8G2_R1;
     }
 
-    return INTERNAL_DISP_ROTATION_LANDSCAPE;
+    return U8G2_R0;
 }
 
 class Display {
 public:
-    Display(uint8_t displayWidth, uint8_t displayHeight, uint8_t i2cAddress, TwoWire *wire) {
-        twoWirePort = wire;
+    Display(uint8_t i2cAddress, uint8_t sdaPin, uint8_t sclPin, U8G2 displayInstance)
+    {
+        _sdaPin = sdaPin;
+        _sclPin = sclPin;
+        display = displayInstance;
         address = i2cAddress;
-        width = displayWidth;
-        height = displayHeight;
         currentRotation = DISPLAY_LANDSCAPE;
-        display = Adafruit_SSD1306(width, height, twoWirePort, -1);
         // Up to 16 hex digits (uint64_t) + newline + NUL
         codeBuf = (char *) calloc(1, CODEBUF_SZ);
     }
@@ -44,16 +45,16 @@ public:
             free(codeBuf);
         }
     }
-    bool begin(uint8_t sdaPin, uint8_t sclPin);
+    bool begin();
 
     DisplayRotation getCurrentRotation() {
         return currentRotation;
     }
-    
+
     bool isDisplayLandscape() {
         return (currentRotation == DISPLAY_LANDSCAPE);
     }
-    
+
     bool isDisplayPortrait() {
         return (currentRotation == DISPLAY_PORTRAIT);
     }
@@ -63,12 +64,10 @@ public:
             return;
         }
 
-        INTERNAL_DisplayRotation internalDisplayRotation = getInternalRotation(rotation, mirrored);
-    
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.setRotation(internalDisplayRotation);
-    
+        display.setDisplayRotation(getInternalRotation(rotation, mirrored));
+        display.clearBuffer();
+        cursorY = 0;
+
         currentRotation = rotation;
     }
 
@@ -94,22 +93,21 @@ public:
             return;
         }
 
-        display.setCursor(0, 0);
-        display.clearDisplay();
+        display.clearBuffer();
+        cursorY = 0;
     }
 
     void printMessage(const char *header, const char *text, int durationMs = 1000);
-    void printCentered(const char *text, int16_t x = 0, int16_t y = 0);
-    void printCenteredH(char *text, int16_t x = 0, int16_t y = 0);
+    void printCenteredH(const char *text, int16_t y);
     void printCode(uint64_t code, const char *flavor);
 private:
-    TwoWire *twoWirePort;
-    uint8_t width;
-    uint8_t height;
     uint8_t address;
+    uint8_t _sdaPin;
+    uint8_t _sclPin;
     DisplayRotation currentRotation;
-    Adafruit_SSD1306 display;
+    U8G2 display;
     bool mirrored = false;
     bool initialized = false;
+    int16_t cursorY = 0;
     char *codeBuf = NULL;
 };

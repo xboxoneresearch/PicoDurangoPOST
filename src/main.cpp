@@ -1,18 +1,12 @@
 #include <atomic>
 
+#include "U8g2lib.h"
+#include "clib/u8x8.h"
 #include "common.h"
 #include "colors.h"
 #include "codes.h"
 #include "config.h"
 #include "platform.h"
-
-#if true
-// Only enqueue segment if segment's lower nibble > 0
-#define SHOULD_ENQUEUE_SEGMENT(x) ((x & 0x0F) != 0)
-#else
-// Enqueue every segment
-#define SHOULD_ENQUEUE_SEGMENT(x) (true)
-#endif
 
 #ifndef __FW_VERSION__
 #define FW_VERSION "unknown version"
@@ -45,8 +39,12 @@ String inputBuffer = "";
 uint8_t pendingI2C0Sda = 0;
 uint8_t pendingI2C0Scl = 0;
 
+// NOTE: Replace with your specific display if needed
+U8G2 displayInstance = U8G2_SSD1306_128X32_UNIVISION_F_2ND_HW_I2C(U8G2_R0, U8X8_PIN_NONE);
+Display display(SSD1306_DISP_ADDRESS, PIN_SDA_DISP, PIN_SCL_DISP, displayInstance);
+
 Config cfg;
-RuntimeState runtimeState;
+RuntimeState runtimeState(display);
 
 void print(const char* header, const char *text, int durationMs = 0) {
     Serial.printf("%s: %s\r\n", header, text);

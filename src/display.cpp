@@ -1,33 +1,26 @@
 
 #include "display.h"
-#include "common.h"
 
-bool Display::begin(uint8_t sdaPin, uint8_t sclPin) {
+#define FONT_SMALL u8g2_font_6x10_tf
+#define FONT_LARGE u8g2_font_profont22_tr
+
+bool Display::begin() {
+    // U8g2's "2ND_HW_I2C" HAL is hardwired to talk to Wire1 and only ever
+    // calls Wire1.begin() with no pin args, so custom pins must be staged
+    // on Wire1 before display.begin() hands off to that HAL.
 #if defined(ARDUINO_ARCH_RP2040)
-    twoWirePort->setSDA(sdaPin);
-    twoWirePort->setSCL(sclPin);
-    twoWirePort->begin();
+    Wire1.setSDA(_sdaPin);
+    Wire1.setSCL(_sclPin);
+    Wire1.begin();
 #elif defined(ARDUINO_ARCH_ESP32)
-    twoWirePort->begin(sdaPin, sclPin);
+    Wire1.begin(_sdaPin, _sclPin);
 #elif defined(TEENSYDUINO)
-    twoWirePort->begin(); // pins fixed in hardware, not configurable
+    Wire1.begin(); // pins fixed in hardware, not configurable
 #endif
 
-    twoWirePort->beginTransmission(address);
-    auto err = twoWirePort->endTransmission();
-    twoWirePort->end();
+    display.setI2CAddress(address << 1);
+    display.begin();
 
-    if (err != 0) {
-        // Device not reachable
-        DBG("Display error: %i", err);
-        return false;
-    } else if (!display.begin(SSD1306_SWITCHCAPVCC, address)) {
-        DBG("Failed to initialize / allocate data for display");
-        return false;
-    }
-
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
     setRotation(currentRotation);
 
     initialized = true;
@@ -39,64 +32,31 @@ void Display::printMessage(const char* header, const char *text, int durationMs)
         return;
     }
 
+    DisplayRotation prevRotation = currentRotation;
+
     clear();
     setRotation(DISPLAY_LANDSCAPE);
 
-    display.setTextSize(1);
-    printCenteredH((char *)header);
-    display.println();
-    display.println();
-    printCenteredH((char *)text);
-    display.display();
+    display.setFont(FONT_SMALL);
+    printCenteredH(header, 12);
+    printCenteredH(text, 28);
+    display.sendBuffer();
 
     if (durationMs > 0) {
         delay(durationMs);
-        display.clearDisplay();
+        clear();
     }
 
-    setRotation(currentRotation);
+    setRotation(prevRotation);
 }
 
-void Display::printCentered(const char *text, int16_t x, int16_t y) {
+void Display::printCenteredH(const char *text, int16_t y) {
     if (!initialized) {
         return;
     }
 
-    int16_t x1, y1;
-    uint16_t w, h;
-
-    if (x == 0)
-        x = display.getCursorX();
-    if (y == 0)
-        y = display.getCursorY();
-
-    display.getTextBounds(text, x, y, &x1, &y1, &w, &h);
-    display.setCursor(
-        (width - w) / 2,
-        (height - h) / 2
-    );
-    display.println(text);
-}
-
-void Display::printCenteredH(char *text, int16_t x, int16_t y) {
-    if (!initialized) {
-        return;
-    }
-
-    int16_t x1, y1;
-    uint16_t w, h;
-
-    if (x == 0)
-        x = display.getCursorX();
-    if (y == 0)
-        y = display.getCursorY();
-
-    display.getTextBounds(text, x, y, &x1, &y1, &w, &h);
-    display.setCursor(
-        (width - w) / 2,
-        y / 2
-    );
-    display.println(text);
+    int16_t w = display.getStrWidth(text);
+    display.drawStr((display.getDisplayWidth() - w) / 2, y, text);
 }
 
 void Display::printCode(uint64_t code, const char *flavor) {
@@ -104,7 +64,7 @@ void Display::printCode(uint64_t code, const char *flavor) {
         return;
     }
 
-    if (isDisplayPortrait() && display.getCursorY() >= width) {
+    if (isDisplayPortrait() && cursorY >= display.getDisplayWidth()) {
         clear();
     }
     else if (isDisplayLandscape()) {
@@ -112,24 +72,20 @@ void Display::printCode(uint64_t code, const char *flavor) {
         clear();
     }
 
-    // Bigger size for landscape mode
-    display.setTextSize(isDisplayLandscape() ? 3 : 1);
-    snprintf(codeBuf, CODEBUF_SZ, "%llX\n", (unsigned long long)code);
+    snprintf(codeBuf, CODEBUF_SZ, "%04llX", (unsigned long long)code);
 
     if (isDisplayLandscape()) {
-        printCenteredH(codeBuf);
-    } else {
-        display.print(codeBuf);
-    }
-
-    if (isDisplayLandscape()) {
-        display.setTextSize(1);
+        display.setFont(FONT_LARGE);
+        printCenteredH(codeBuf, display.getDisplayHeight() - 4);
 
         // Print Code flavor in the top-left corner
-        display.setCursor(0,0);
-        display.printf("%s", flavor);
-
-        display.setTextSize(2);
+        display.setFont(FONT_SMALL);
+        display.drawStr(0, 8, flavor);
+    } else {
+        display.setFont(FONT_SMALL);
+        cursorY += display.getMaxCharHeight() + 1;
+        display.drawStr(0, cursorY, codeBuf);
     }
-    display.display();
+
+    display.sendBuffer();
 }
