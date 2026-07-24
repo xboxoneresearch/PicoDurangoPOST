@@ -1,6 +1,5 @@
 
 #include "display.h"
-#include "common.h"
 
 #define FONT_SMALL u8g2_font_6x10_tf
 #define FONT_LARGE u8g2_font_profont22_tr
@@ -14,7 +13,7 @@ bool Display::begin() {
     Wire1.setSCL(_sclPin);
     Wire1.begin();
 #elif defined(ARDUINO_ARCH_ESP32)
-    Wire1.begin(sdaPin, sclPin);
+    Wire1.begin(_sdaPin, _sclPin);
 #elif defined(TEENSYDUINO)
     Wire1.begin(); // pins fixed in hardware, not configurable
 #endif
