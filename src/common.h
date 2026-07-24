@@ -8,8 +8,6 @@
 #include "platform.h"
 
 /* DISPLAY */
-#define DISP_SCREEN_WIDTH 128
-#define DISP_SCREEN_HEIGHT 32
 #define SSD1306_DISP_ADDRESS 0x3C
 
 /* MAX6958 emulation */
@@ -113,7 +111,7 @@ static const char *getNameForMAX6958Register(uint8_t reg) {
 
 class RuntimeState {
 public:
-    RuntimeState();
+    RuntimeState(Display display);
 
     bool begin();
 
