@@ -1,0 +1,25 @@
+{
+  "name": "I2CSniffer",
+  "version": "0.1.0",
+  "description": "Passive, bit-banged I2C bus sniffer for a single target address - watches SDA/SCL as plain GPIO inputs and reconstructs START/ADDRESS/DATA/STOP events without acting as a bus participant. Callback-registration API modeled on TwoWire's onReceive()/onRequest().",
+  "keywords": ["i2c", "sniffer", "bus", "monitor", "twowire"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xboxoneresearch/PicoDurangoPOST"
+  },
+  "authors": [
+    {
+      "name": "XboxOneResearch",
+      "url": "https://github.com/xboxoneresearch"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*",
+  "dependencies": {
+    "smfsw/Queue": "^2.0"
+  },
+  "export": {
+    "include": "src"
+  }
+}
