@@ -6,6 +6,7 @@
 #include "codes.h"
 #include "display.h"
 #include "platform.h"
+#include "socpost_decode.h"
 
 /* DISPLAY */
 #define SSD1306_DISP_ADDRESS 0x3C
@@ -41,6 +42,7 @@ enum State {
     STATE_PRINT_HELP,
     STATE_BOOTSEL,
     STATE_SET_I2C0_PINS,
+    STATE_SOCPOST,
 };
 
 // For communication between core0/1
@@ -48,6 +50,8 @@ enum CrossThreadMsg: uint32_t {
     INVALID = 0,
     RESET_TIMESTAMP = 1,
     SET_I2C0_PINS = 2, // low byte = this code, byte 1 = SDA pin, byte 2 = SCL pin
+    ENTER_SOCPOST = 3,
+    EXIT_SOCPOST = 4,
 };
 
 static inline uint32_t packSetI2C0PinsMsg(uint8_t sda, uint8_t scl) {
@@ -145,6 +149,26 @@ public:
     }
     inline void clearPostCodeQueue() { _postCodeQueue.clean(); }
 
+    inline bool isSocPostLineQueueEmpty() { return _socPostLineQueue.isEmpty(); }
+    inline void clearSocPostLineQueue() { _socPostLineQueue.clean(); }
+
+    inline bool popSocPostCode(SocPostCode *outPostCode) {
+        if (_socPostLineQueue.getCount() > 0 && _socPostLineQueue.pop(&outPostCode)) {
+            return true;
+        }
+        return false;
+    }
+
+    inline void pushSocPostLine(uint32_t postCode, bool isExtended) {
+        if (!_socPostLineQueue.isFull()) {
+            SocPostCode entry = {
+                .postCode = postCode,
+                .isExtendedCode = isExtended
+            };
+            _socPostLineQueue.push(&entry);
+        }
+    }
+
     inline void setSegmentCode(uint8_t segmentByte, uint16_t codeWord) {
         uint8_t code_idx = 0;
         switch (segmentByte & SEGMENT_INDEX_MASK) {
@@ -210,6 +234,8 @@ private:
     Display  _display;
     // Create a queue for POST codes
     cppQueue _postCodeQueue;
+    // Queue for socpost text lines (core1 sniffer -> core0)
+    cppQueue _socPostLineQueue;
 
     inline void pushPostCode(SegmentData* segData) {
         if (!isPostCodeQueueFull()) {

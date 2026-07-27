@@ -1,8 +1,9 @@
 #include "common.h"
 
 RuntimeState::RuntimeState(Display display) :
+    _display(display),
     _postCodeQueue(sizeof(SegmentData), POST_MAX_QUEUE_SIZE, FIFO),
-    _display(display)
+    _socPostLineQueue(sizeof(SocPostCode), POST_MAX_QUEUE_SIZE, FIFO)
 {}
 
 bool RuntimeState::begin() {
