@@ -217,11 +217,6 @@ void core1_receiveI2cData(int howMany) {
             reg++;
         }
     }
-
-    // Add the assembled code
-    if (runtimeState.isCodeReady()) {
-        runtimeState.enqueueCode();
-    }
 }
 
 void initXboxWire(uint8_t sdaPin, uint8_t sclPin) {
