@@ -146,8 +146,20 @@ public:
     inline void clearPostCodeQueue() { _postCodeQueue.clean(); }
 
     inline void setSegmentCode(uint8_t segmentByte, uint16_t codeWord) {
+        SegmentByte seg(segmentByte);
+        uint8_t rawIndex = seg.index();
+
+        if (rawIndex == 0) {
+            // Blank write: no digit data, but the console sends it between
+            // every part of a genuine multi-part code tagged with that code's flavor.
+            if (currSegment.index() != 0 && seg.flavor() == currSegment.flavor()) {
+                sawContinuationMarker = true;
+            }
+            return;
+        }
+
         uint8_t code_idx = 0;
-        switch (segmentByte & SEGMENT_INDEX_MASK) {
+        switch (rawIndex) {
             case 1:
                 code_idx = 0;
                 break;
@@ -164,14 +176,24 @@ public:
                 return;
         }
 
-        codeWords[code_idx] = codeWord;
-        currSegment = SegmentByte(segmentByte);
-    }
+        bool isContinuation = currSegment.index() != 0
+            && sawContinuationMarker
+            && seg.flavor() == currSegment.flavor();
 
-    inline bool isCodeReady() {
-        // Codes come in MSB-first (index order: 8, 4, 2, 1)
-        // When index is 1, full code was transmitted from console
-        return currSegment.index() == 1;
+        if (currSegment.index() != 0 && !isContinuation) {
+            // Pending accumulation was never continued (no matching blank
+            // marker seen); flush it standalone instead of merging stale
+            // data into this segment.
+            enqueueCode();
+        }
+
+        codeWords[code_idx] = codeWord;
+        currSegment = seg;
+        sawContinuationMarker = false;
+
+        if (rawIndex == 1) {
+            enqueueCode();
+        }
     }
 
     inline void enqueueCode() {
@@ -199,6 +221,10 @@ private:
     SegmentByte currSegment = SegmentByte(0);
 
     uint16_t codeWords[POST_CODE_WORD_COUNT] = {0};
+    // Set when an index-0 (blank) Segments write of the same flavor as
+    // currSegment is observed; consumed by the next real segment to prove
+    // it's a genuine continuation rather than an unrelated/abandoned one.
+    bool sawContinuationMarker = false;
     uint64_t codeCache[CODE_IDX_MAX] = {0};
 
     State currentState = STATE_POST_MONITOR;
@@ -231,5 +257,6 @@ private:
         codeWords[1] = 0;
         codeWords[2] = 0;
         codeWords[3] = 0;
+        sawContinuationMarker = false;
     }
 };
