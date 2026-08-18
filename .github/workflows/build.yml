@@ -33,7 +33,7 @@ jobs:
 
           python3 "$ESPTOOL" --chip esp32 merge_bin \
             -o .pio/build/esp32/durango_post_monitor_esp32.bin \
-            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            --flash_mode dio --flash_freq 40m --flash_size 2MB \
             0x1000 .pio/build/esp32/bootloader.bin \
             0x8000 .pio/build/esp32/partitions.bin \
             0xe000 "$BOOT_APP0" \
@@ -41,7 +41,7 @@ jobs:
 
           python3 "$ESPTOOL" --chip esp32s3 merge_bin \
             -o .pio/build/esp32s3/durango_post_monitor_esp32s3.bin \
-            --flash_mode dio --flash_freq 80m --flash_size 8MB \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
             0x0 .pio/build/esp32s3/bootloader.bin \
             0x8000 .pio/build/esp32s3/partitions.bin \
             0xe000 "$BOOT_APP0" \
