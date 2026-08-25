@@ -1,4 +1,4 @@
-
+#include <string.h>
 #include "display.h"
 
 #define FONT_SMALL u8g2_font_6x10_tf
@@ -81,6 +81,16 @@ void Display::printCode(uint64_t code, const char *flavor) {
         // Print Code flavor in the top-left corner
         display.setFont(FONT_SMALL);
         display.drawStr(0, 8, flavor);
+
+        // Bus badge in the top-right corner: filled box + inverted text
+        int16_t badgeW = display.getStrWidth(badgeText) + 4;
+        int16_t badgeH = display.getMaxCharHeight() + 2;
+        int16_t badgeX = display.getDisplayWidth() - badgeW;
+        display.setDrawColor(1);
+        display.drawRBox(badgeX, 0, badgeW, badgeH, 2);
+        display.setDrawColor(0);
+        display.drawStr(badgeX + 2, badgeH - 2, badgeText);
+        display.setDrawColor(1);
     } else {
         display.setFont(FONT_SMALL);
         cursorY += display.getMaxCharHeight() + 1;
@@ -88,4 +98,9 @@ void Display::printCode(uint64_t code, const char *flavor) {
     }
 
     display.sendBuffer();
+}
+
+void Display::setBadge(const char *badge) {
+    strncpy(badgeText, badge, sizeof(badgeText) - 1);
+    badgeText[sizeof(badgeText) - 1] = '\0';
 }

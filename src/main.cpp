@@ -7,6 +7,7 @@
 #include "codes.h"
 #include "config.h"
 #include "platform.h"
+#include "socpost_decode.h"
 
 #ifndef __FW_VERSION__
 #define FW_VERSION "unknown version"
@@ -33,7 +34,14 @@
 std::atomic<uint32_t> msg_core0{INVALID};
 
 SegmentData currentSegData = {0};
+SocPostCode currentSocPostCode = {0};
 bool postMonitorRunning = false;
+bool socPostRunning = false;
+SocPostDecoder socPostDecoder = SocPostDecoder();
+// Only (re)created in ENTER_SOCPOST (core1) - never deleted from EXIT_SOCPOST,
+// so core0 can safely read droppedEvents() right after requesting an exit
+// without racing a cross-core delete. See loop1()/STATE_RETURN_TO_REPL.
+I2CSniffer *socPostSniffer = nullptr;
 
 String inputBuffer = "";
 uint8_t pendingI2C0Sda = 0;
@@ -45,6 +53,14 @@ Display display(SSD1306_DISP_ADDRESS, PIN_SDA_DISP, PIN_SCL_DISP, displayInstanc
 
 Config cfg;
 RuntimeState runtimeState(display);
+
+void onSocPostSniffEvent(I2CSnifferEvent event, uint8_t byte, void *) {
+    SocPostCode out = {0};
+    socPostDecoder.handleEvent(event, byte, out);
+    if (out.postCode != 0) {
+        runtimeState.pushSocPostLine(out.postCode, out.isExtendedCode);
+    }
+}
 
 void print(const char* header, const char *text, int durationMs = 0) {
     Serial.printf("%s: %s\r\n", header, text);
@@ -70,6 +86,7 @@ void printHelp() {
     Serial.println("Serial monitor: https://github.com/xboxoneresearch/XboxPostcodeMonitor");
     Serial.println("\r\nAvailable commands:");
     Serial.println("  post    - Start POST code monitoring");
+    Serial.println("  socpost - Start passive SoC ErrStat/SBMSG0/POST/SocID sniffing (addr 0x4C)");
     // Modifiers for POST monitor
     Serial.println("\r\nPOST modifiers:");
     Serial.println("  ts      - Toggle showing timestamps");
@@ -112,6 +129,8 @@ void handleRepl() {
                 inputBuffer.trim();
                 if (inputBuffer == "post") {
                     runtimeState.setCurrentState(STATE_POST_MONITOR);
+                } else if (inputBuffer == "socpost") {
+                    runtimeState.setCurrentState(STATE_SOCPOST);
                 } else if (inputBuffer == "rotate") {
                     runtimeState.setCurrentState(STATE_DISPLAY_ROTATE);
                 } else if (inputBuffer == "mirror") {
@@ -166,8 +185,7 @@ void printRegisters() {
     }
 }
 
-void printCode(uint64_t code, CodeFlavor flavor, uint64_t timestamp) {
-    const char *flavor_str = getStringForCodeFlavor(flavor);
+void printCode(uint64_t code, const char *flavor_str, uint64_t timestamp) {
     runtimeState.display()->printCode(code, flavor_str);
     
     // Color is only printed if `printColors` is set
@@ -257,7 +275,30 @@ void loop1() {
             runtimeState.setXboxI2CPins(sda, scl);
             break;
         }
+        case ENTER_SOCPOST:
+            // Release the hw I2C slave role - socpost needs the pins as
+            // plain GPIOs to passively sniff traffic addressed to a chip
+            // we don't own (can't ACK-collide with the real 0x4C device).
+            Wire.end();
+            socPostDecoder.reset();
+            runtimeState.clearSocPostLineQueue();
+            // Recreated here (not in EXIT_SOCPOST) to pick up the current
+            // Xbox bus pins - both of which can change between sessions via
+            // the "i2c0" command. Only ever touched from this core1 context.
+            delete socPostSniffer;
+            socPostSniffer = new I2CSniffer(SOC_POST_TARGET_ADDR, runtimeState.getXboxSdaPin(), runtimeState.getXboxSclPin());
+            socPostSniffer->onEvent(onSocPostSniffEvent);
+            socPostSniffer->begin();
+            break;
+        case EXIT_SOCPOST:
+            if (socPostSniffer) socPostSniffer->end();
+            initXboxWire(runtimeState.getXboxSdaPin(), runtimeState.getXboxSclPin());
+            break;
     }
+
+    // Dispatch any sniffer-classified bus events accumulated since last
+    // iteration - cheap no-op when socpost isn't running.
+    if (socPostSniffer) socPostSniffer->update();
 }
 
 /* CORE 1 END */
@@ -315,6 +356,14 @@ void loop() {
             if (postMonitorRunning) {
                 postMonitorRunning = false;
             }
+            if (socPostRunning) {
+                socPostRunning = false;
+                sendMessageToCore1(EXIT_SOCPOST);
+                uint32_t dropped = socPostSniffer ? socPostSniffer->droppedEvents() : 0;
+                if (dropped > 0) {
+                    Serial.printf("socpost: %lu bus events dropped (queue overflow)\r\n", (unsigned long)dropped);
+                }
+            }
 
             runtimeState.setCurrentState(STATE_REPL);
             Serial.print(">> ");  // REPL prompt after returning
@@ -328,6 +377,7 @@ void loop() {
             if (!postMonitorRunning) {
                 postMonitorRunning = true;
                 sendMessageToCore1(RESET_TIMESTAMP);
+                runtimeState.display()->setBadge("SB");
                 runtimeState.display()->clear();
                 Serial.println("Entering POST monitoring mode. Press CTRL+C to exit.");
             }
@@ -335,10 +385,30 @@ void loop() {
             // Process all codes in the queue
             while (!runtimeState.isPostCodeQueueEmpty()) {
                 if(runtimeState.popPostCode(&currentSegData)) {
-                    printCode(currentSegData.code, currentSegData.flavor, currentSegData.timestamp);
+                    printCode(
+                        currentSegData.code,
+                        getStringForCodeFlavor(currentSegData.flavor),
+                        currentSegData.timestamp
+                    );
                 }
             }
             break;
+
+        case STATE_SOCPOST:
+            if (!socPostRunning) {
+                socPostRunning = true;
+                sendMessageToCore1(ENTER_SOCPOST);
+                sendMessageToCore1(RESET_TIMESTAMP);
+                runtimeState.display()->setBadge("SOC");
+                runtimeState.display()->clear();
+                Serial.println("Entering SoC POST sniffing mode (addr 0x4C, passive). Press CTRL+C to exit.");
+            }
+
+            while (runtimeState.popSocPostCode(&currentSocPostCode)) {
+                printCode(currentSocPostCode.postCode, "SOC", currentSegData.timestamp);
+            }
+            break;
+
         case STATE_LAST_CODES:
             Serial.println("--- Last codes ---");
             Serial.printf("CPU: 0x%llx\r\n", runtimeState.getCachedCode(CODE_IDX_CPU));

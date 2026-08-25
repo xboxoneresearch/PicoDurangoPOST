@@ -100,6 +100,12 @@ public:
     void printMessage(const char *header, const char *text, int durationMs = 1000);
     void printCenteredH(const char *text, int16_t y);
     void printCode(uint64_t code, const char *flavor);
+
+    // Top-right corner badge distinguishing which bus a code came from
+    // ("SB" for the regular MAX6958-emulation POST bus, "SOC" for the
+    // passive socpost sniffer). Sticky across printCode() calls so callers
+    // don't need to pass it on every call - set once when a mode starts.
+    void setBadge(const char *badge);
 private:
     uint8_t address;
     uint8_t _sdaPin;
@@ -110,4 +116,5 @@ private:
     bool initialized = false;
     int16_t cursorY = 0;
     char *codeBuf = NULL;
+    char badgeText[8] = "SB";
 };
